@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Familjens kockbok</title>
+<meta name="description" content="Familjens egen kockcoach och kockbok">
+<meta name="theme-color" content="#2E6A4C">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app" id="app" data-chat="closed">
+  <header class="topbar">
+    <button class="brand" data-go="home" aria-label="Till startsidan">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="18" r="11" fill="currentColor" opacity=".18"/><path d="M5 18h22a11 11 0 0 1-22 0Z" fill="currentColor"/><path d="M12 4c1.5 2-1.5 3 0 5M17 3c1.5 2-1.5 3 0 5M22 4c1.5 2-1.5 3 0 5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+      <span>Familjens kockbok</span>
+    </button>
+    <nav class="nav" aria-label="Huvudmeny">
+      <button data-go="home" class="nav-btn">Kocken</button>
+      <button data-go="book" class="nav-btn">Kockboken</button>
+      <button data-go="settings" class="nav-btn" aria-label="Inställningar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <span class="nav-label">Inställningar</span>
+      </button>
+    </nav>
+    <div class="timers" id="timers" aria-live="polite"></div>
+    <span class="sync" id="sync" title=""></span>
+  </header>
+
+  <main class="stage" id="stage" tabindex="-1"></main>
+
+  <aside class="chat" id="chat" aria-label="Fråga kocken">
+    <div class="chat-head">
+      <h2>Fråga kocken</h2>
+      <button class="ghost small" id="chatNew" title="Börja om konversationen">Ny tråd</button>
+      <button class="icon-btn" id="chatClose" aria-label="Stäng chatten">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="chat-log" id="chatLog" aria-live="polite"></div>
+    <form class="composer" id="composer">
+      <div class="attach-preview" id="chatAttach" hidden></div>
+      <div class="composer-row">
+        <label class="icon-btn" title="Lägg till foto">
+          <input type="file" accept="image/*" id="chatFile" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </label>
+        <textarea id="chatInput" rows="1" placeholder="Fråga om receptet, byt en råvara…" aria-label="Meddelande till kocken"></textarea>
+        <button class="send" type="submit" aria-label="Skicka">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </form>
+  </aside>
+
+  <button class="chat-tab" id="chatTab" aria-controls="chat" aria-expanded="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+    <span>Fråga kocken</span>
+    <i class="dot" id="chatDot" hidden></i>
+  </button>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
