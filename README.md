@@ -10,7 +10,7 @@ Familjens egen kockcoach som en webbapp. Den fungerar på dator, mobil och surfp
 ## Kom igång
 
 1. Öppna appen och gå till **Inställningar**.
-2. **Kockens AI:** Klistra in en Claude-nyckel från https://console.anthropic.com/settings/keys. Gemini går också att välja.
+2. **Kockens AI:** Klistra in en gratis Gemini-nyckel från https://aistudio.google.com/apikey. Claude går också att välja.
 3. **Dela kockboken** (för att mamma och pappa ska se samma kockbok på alla enheter):
    - Skapa en GitHub-token med bara behörigheten `gist`.
    - Klistra in den och tryck på **Skapa delad kockbok**.

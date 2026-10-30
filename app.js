@@ -73,7 +73,7 @@ Regler:
 - Använd smakminnet och kockboken nedan för att träffa vår smak. Föreslå gärna variationer på rätter vi gett högt betyg.
 - Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.`;
 
-const DEFAULT_MODELS = { gemini: 'gemini-flash-latest', claude: 'claude-sonnet-5-5' };
+const DEFAULT_MODELS = { gemini: 'gemini-3.8-flash', claude: 'claude-sonnet-5-5' };
 const DATA_FILE = 'familjens-kockbok.json';
 
 /* ============ Lagring ============ */
@@ -89,7 +89,7 @@ function freshData() {
            memory: [], recipes: [], deleted: {} };
 }
 const S = {
-  settings: Object.assign({ provider: 'claude', geminiKey: '', geminiModel: DEFAULT_MODELS.gemini,
+  settings: Object.assign({ provider: 'gemini', geminiKey: '', geminiModel: DEFAULT_MODELS.gemini,
     claudeKey: '', claudeModel: DEFAULT_MODELS.claude, ghToken: '', gistId: '', theme: 'auto' }, LS.get('fk.settings', {})),
   data: Object.assign(freshData(), LS.get('fk.data', {})),
   chat: LS.get('fk.chat', []),
@@ -103,6 +103,12 @@ const S = {
   sync: { state: '', timer: null },
   timers: [],
 };
+// Gemini är standard (gratis). Flytta över äldre inställningar som saknar Claude-nyckel.
+if (!S.settings.migratedGemini) {
+  if (!S.settings.claudeKey) S.settings.provider = 'gemini';
+  if (S.settings.geminiModel === 'gemini-flash-latest') S.settings.geminiModel = DEFAULT_MODELS.gemini;
+  S.settings.migratedGemini = true; saveSettings();
+}
 if (!S.current) S.current = { suggestions: null, suggIntro: '', recipe: null, recipeSavedId: null, dirty: false };
 
 function saveSettings() { LS.set('fk.settings', S.settings); }
@@ -320,7 +326,7 @@ async function send(text, image) {
     if (!recipe && !sugg) openChat(true);
   } catch (e) {
     const nokey = e.message === 'NOKEY';
-    S.chat.push({ role: 'error', text: nokey ? 'Kocken behöver en API-nyckel. Lägg in den under Inställningar.' : `Det gick inte att nå kocken: ${e.message}`, nokey, at: now() });
+    S.chat.push({ role: 'error', text: nokey ? 'Kocken behöver en gratis Gemini-nyckel. Lägg in den under Inställningar.' : `Det gick inte att nå kocken: ${e.message}`, nokey, at: now() });
     openChat(true);
   } finally {
     S.busy = false; saveChat(); renderChat(true);
@@ -616,7 +622,7 @@ function viewSettings() {
         <div class="seg" role="group"><button type="button" data-prov="gemini" aria-pressed="${p === 'gemini'}">Google Gemini</button><button type="button" data-prov="claude" aria-pressed="${p === 'claude'}">Anthropic Claude</button></div></div>
       ${p === 'gemini' ? `
         <div class="field"><label for="geminiKey">Gemini API-nyckel</label><input id="geminiKey" type="password" autocomplete="off" value="${esc(s.geminiKey)}">
-          <span class="hint">Skapa en gratis nyckel på <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.</span></div>
+          <span class="hint">Gratis: skapa en nyckel på <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. På gratisnivån får Google använda frågorna för att förbättra sina tjänster.</span></div>
         <div class="field"><label for="geminiModel">Modell</label><input id="geminiModel" value="${esc(s.geminiModel)}"><span class="hint">Standard: ${DEFAULT_MODELS.gemini}</span></div>`
       : `
         <div class="field"><label for="claudeKey">Claude API-nyckel</label><input id="claudeKey" type="password" autocomplete="off" value="${esc(s.claudeKey)}">
