@@ -445,11 +445,14 @@ function showProgress(acc, override) {
   const r = partialReply(acc);
   if (live && r) { live.classList.remove('typing'); live.innerHTML = md(r); const log = $('#chatLog'); log.scrollTop = log.scrollHeight; }
 }
-async function send(text, image) {
+// flow = receptval från huvudfönstret (knappar/startsida). Syns inte i chatten, men kocken minns det.
+async function send(text, image, opts = {}) {
   text = (text || '').trim();
   if ((!text && !image) || S.busy) return;
-  S.chat.push({ role: 'user', text: text || 'Vad kan jag laga av det här?', image, at: now() });
-  S.busy = true; saveChat(); renderChat(true);
+  const flow = !!opts.flow;
+  const userMsg = { role: 'user', text: text || 'Vad kan jag laga av det här?', image, at: now(), hidden: flow };
+  S.chat.push(userMsg);
+  S.busy = flow ? 'flow' : 'chat'; saveChat(); renderChat(true);
   if (S.route.view === 'home' || S.route.view === 'suggestions') renderStage();
   try {
     const raw = await callModel(showProgress);
@@ -462,10 +465,12 @@ async function send(text, image) {
       S.current.recipe = recipe; S.current.recipeSavedId = keepId; S.current.dirty = !!keepId;
       S.checked = {}; S.doneSteps = {}; S.activeStep = null;
       msg.view = { recipe };
-      go('recipe', { keepChat: true });
+      if (flow) msg.hidden = true; else msg.updated = true;
+      if (S.route.view !== 'recipe') go('recipe', { keepChat: true }); else { const sc = $('#stage').scrollTop; renderStage(); $('#stage').scrollTop = sc; }
     } else if (sugg) {
       S.current.suggestions = sugg; S.current.suggIntro = o.reply || '';
       msg.view = { suggestions: sugg };
+      msg.hidden = true; userMsg.hidden = true;
       go('suggestions', { keepChat: true });
     }
     const learned = (Array.isArray(o.learn) ? o.learn : []).map(s => String(s).trim()).filter(Boolean);
@@ -475,9 +480,10 @@ async function send(text, image) {
       fresh.forEach(t => S.data.memory.push({ id: uid(), text: t, at: now(), updatedAt: now() }));
       if (fresh.length) { msg.learned = fresh; saveData(); }
     }
+    // Motfråga eller vanligt svar på ett receptval: visa i chatten med frågan
+    if (!recipe && !sugg) { userMsg.hidden = false; msg.hidden = false; openChat(true); }
     S.chat.push(msg);
     saveCurrent();
-    if (!recipe && !sugg) openChat(true);
   } catch (e) {
     const nokey = e.message === 'NOKEY';
     S.chat.push({ role: 'error', text: nokey ? 'Kocken behöver en gratis Gemini-nyckel. Lägg in den under Inställningar.' : `Det gick inte att nå kocken: ${e.message}`, nokey, at: now() });
@@ -498,6 +504,7 @@ function go(view, opts = {}) {
   renderStage();
   $('#stage').scrollTop = 0;
   updateWakeLock();
+  renderChat();
 }
 document.addEventListener('click', e => {
   const g = e.target.closest('[data-go]');
@@ -543,43 +550,37 @@ function renderAttach() {
 }
 function renderChat(scroll) {
   const log = $('#chatLog');
-  if (!S.chat.length) {
-    log.innerHTML = `<div class="chat-empty"><p>Fråga vad som helst medan du lagar – svaren hamnar här och receptet stannar kvar till vänster.</p>
-      <button class="chip" data-ask="Hur räddar jag en sås som skurit sig?">Såsen skar sig</button>
-      <button class="chip" data-ask="Vilken innertemp ska jag ha på karré?">Innertemp karré</button>
-      <button class="chip" data-ask="Vad kan jag byta grädde mot för att göra det lättare?">Byt ut grädden</button></div>`;
+  const visible = S.chat.filter(m => !m.hidden);
+  const r = S.current.recipe && S.route.view === 'recipe' ? S.current.recipe : null;
+  if (!visible.length) {
+    const asks = r
+      ? [['Kan jag förbereda något i förväg?', 'Förbereda i förväg'], ['Vad kan jag byta ut om jag saknar något?', 'Saknar en råvara'], ['Gör receptet lite lättare utan att tappa smak.', 'Gör den lättare']]
+      : [['Hur räddar jag en sås som skurit sig?', 'Såsen skar sig'], ['Vilken innertemperatur ska fläskkarré ha?', 'Innertemp karré'], ['Hur länge ska ris vila efter kokning?', 'Vila riset']];
+    log.innerHTML = `<div class="chat-empty"><p>${r ? `Frågor om <strong>${esc(r.title)}</strong>. Ber du om en ändring uppdateras receptet direkt.` : 'Snabba frågor medan du lagar. Recept väljer du i huvudfönstret.'}</p>
+      ${asks.map(([q, l]) => `<button class="chip" data-ask="${esc(q)}">${esc(l)}</button>`).join('')}</div>`;
   } else {
-    log.innerHTML = S.chat.map((m, i) => {
+    log.innerHTML = visible.map(m => {
       if (m.role === 'user') return `<div class="msg user">${m.image ? `<img src="${m.image.url}" alt="Bifogat foto">` : ''}${md(m.text)}</div>`;
       if (m.role === 'error') return `<div class="msg error">${esc(m.text)}${m.nokey ? ` <button class="view-link" data-go="settings">Öppna inställningar</button>` : ''}</div>`;
       let extra = '';
-      if (m.view?.recipe) extra += `<button class="view-link" data-view="${i}">Visa receptet: ${esc(m.view.recipe.title)}</button>`;
-      if (m.view?.suggestions) extra += `<button class="view-link" data-view="${i}">Visa ${m.view.suggestions.length} förslag</button>`;
+      if (m.updated) extra += `<div class="learned">✓ Receptet är uppdaterat</div>`;
       if (m.learned?.length) extra += `<div class="learned">Kocken kommer ihåg: ${m.learned.map(esc).join(' · ')}</div>`;
       return `<div class="msg assistant">${md(m.text) || ''}${extra}</div>`;
     }).join('');
   }
-  if (S.busy) log.insertAdjacentHTML('beforeend', `<div class="msg assistant typing" id="liveReply" aria-label="Kocken skriver"><i></i><i></i><i></i></div>`);
+  if (S.busy === 'chat') log.insertAdjacentHTML('beforeend', `<div class="msg assistant typing" id="liveReply" aria-label="Kocken skriver"><i></i><i></i><i></i></div>`);
   $('#chatInput').disabled = false;
-  $('#composer .send').disabled = S.busy;
+  $('#composer .send').disabled = !!S.busy;
   if (scroll) log.scrollTop = log.scrollHeight;
 }
 $('#chatLog').addEventListener('click', e => {
   const a = e.target.closest('[data-ask]');
-  if (a) { send(a.dataset.ask); return; }
-  const v = e.target.closest('[data-view]');
-  if (v) {
-    const m = S.chat[+v.dataset.view];
-    if (m.view.recipe) { S.current.recipe = m.view.recipe; S.current.recipeSavedId = null; S.current.dirty = false; S.checked = {}; S.doneSteps = {}; go('recipe'); }
-    else { S.current.suggestions = m.view.suggestions; S.current.suggIntro = m.text; go('suggestions'); }
-    saveCurrent();
-  }
+  if (a) send(a.dataset.ask);
 });
 
 /* ============ Vyer ============ */
 function renderStage() {
   const st = $('#stage');
-  st.classList.toggle('fill', S.route.view === 'recipe');
   const v = S.route.view;
   if (v === 'home') st.innerHTML = viewHome();
   else if (v === 'suggestions') st.innerHTML = viewSuggestions();
@@ -597,7 +598,7 @@ function viewHome() {
     : `${d.manual ? 'Vardagsläge' : `Det är <strong>${d.name}</strong> – vardag`}. Kocken håller det snabbt, med lite disk.`)
     + ` <button class="linkish" data-status>Ändra</button>`;
   const recent = S.data.recipes.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 4);
-  if (S.busy) {
+  if (S.busy === 'flow') {
     return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Kocken tänker…</span></div></section>`;
   }
   return `<section class="home">
@@ -635,7 +636,7 @@ function potSvg() {
 }
 
 function viewSuggestions() {
-  if (S.busy) return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Kocken tänker…</span></div></section>`;
+  if (S.busy === 'flow') return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Kocken tänker…</span></div></section>`;
   const list = S.current.suggestions || [];
   if (!list.length) return `<div class="empty"><h2>Inga förslag än</h2><p>Berätta vad ni har så föreslår kocken rätter.</p><button class="btn" data-go="home">Till kocken</button></div>`;
   return `<section>
@@ -673,61 +674,64 @@ function viewRecipe() {
     if (!g) groups.push(g = { name: ing.group || '', items: [] });
     g.items.push(ing);
   });
-  const ingById = Object.fromEntries(r.ingredients.map(i => [i.id, i]));
   const checkedCount = r.ingredients.filter(i => S.checked[i.id]).length;
+  const doneCount = r.steps.filter((_, n) => S.doneSteps[n]).length;
   const isHelg = String(r.tag).toLowerCase() === 'helg';
-  return `
-  <div class="r-head">
-    <div class="r-title">
-      <h1>${esc(r.title)}</h1>
-      <div class="r-meta">
-        ${r.tag ? `<span class="tag ${isHelg ? 'helg' : 'vardag'}">${isHelg ? 'Helg' : 'Vardag'}</span>` : ''}
-        ${r.origin || r.countries ? `<span class="origin">${flags(r)}<span>${esc(r.origin || '')}</span></span>` : ''}
-        ${r.time ? `<span>${esc(r.time)}</span>` : ''}
-        <span>${esc(r.servings)} portioner</span>
-        ${saved?.rating ? `<span class="rt" style="color:var(--kunyit)">${'★'.repeat(saved.rating)}</span>` : ''}
-      </div>
-      ${r.intro ? `<p class="r-intro">${esc(r.intro)}</p>` : ''}
+  return `<article class="recipe">
+  <header class="r-head">
+    ${r.origin || r.countries ? `<div class="r-origin origin">${flags(r)}<span>${esc(r.origin || '')}</span></div>` : ''}
+    <h1>${esc(r.title)}</h1>
+    <div class="r-meta">
+      ${r.tag ? `<span class="tag ${isHelg ? 'helg' : 'vardag'}">${isHelg ? 'Helg' : 'Vardag'}</span>` : ''}
+      ${r.time ? `<span>${esc(r.time)}</span>` : ''}
+      <span>${esc(r.servings)} portioner</span>
+      ${saved?.rating ? `<span style="color:var(--kunyit)">${'★'.repeat(saved.rating)}</span>` : ''}
     </div>
+    ${r.intro ? `<p class="r-intro">${esc(r.intro)}</p>` : ''}
     <div class="r-actions">
       ${!saved ? `<button class="btn" data-save>Spara i kockboken</button>`
         : S.current.dirty ? `<button class="btn" data-save>Spara ändringarna</button>`
         : `<button class="ghost" data-cooked>Vi lagade den idag</button>`}
-      ${S.current.suggestions && !saved ? `<button class="ghost" data-go="suggestions">Förslagen</button>` : ''}
+      ${S.current.suggestions && !saved ? `<button class="ghost" data-go="suggestions">Tillbaka till förslagen</button>` : ''}
       ${saved ? `<button class="ghost" data-go="book">Kockboken</button>` : ''}
     </div>
-  </div>
-  <div class="r-body">
-    <section class="pane ingredients" aria-label="Ingredienser">
-      <div class="pane-head"><h2>Ingredienser</h2><span class="count">${checkedCount}/${r.ingredients.length} framme</span></div>
-      <div class="pane-inner">
-        ${groups.map(g => `${g.name ? `<div class="group-label">${esc(g.name)}</div>` : ''}
-          ${g.items.map(i => `<label class="ing ${S.checked[i.id] ? 'checked' : ''}" data-ing="${esc(i.id)}">
-            <input type="checkbox" ${S.checked[i.id] ? 'checked' : ''} data-check="${esc(i.id)}">
-            <span class="amt">${esc(i.amount)}</span>
-            <span><span class="name">${esc(i.name)}</span>${i.note ? ` <span class="note">${esc(i.note)}</span>` : ''}</span>
-          </label>`).join('')}`).join('')}
-        ${r.health ? `<div class="health"><h3>${esc(healthLabel())}</h3>${r.health.summary ? `<div>${md(r.health.summary)}</div>` : ''}
-          ${r.health.tips?.length ? `<ul>${r.health.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>` : ''}
-        ${r.tips?.length ? `<div class="tips"><h3>Kockens tips</h3><ul>${r.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
-      </div>
-    </section>
-    <section class="pane steps" aria-label="Gör så här">
-      <div class="pane-head"><h2>Gör så här</h2><span class="count">${r.steps.length} steg</span></div>
-      <div class="pane-inner">
-        <ol>${r.steps.map((s, n) => `
-          <li class="step ${S.activeStep === n ? 'active' : ''} ${S.doneSteps[n] ? 'done' : ''}" data-step="${n}">
-            <div class="step-text">${highlightAmounts(s.text)}</div>
-            ${s.uses.length ? `<div class="step-uses">${s.uses.filter(u => ingById[u]).map(u => `<button class="use" data-lite="${esc(u)}" title="Visa i ingredienslistan">${esc(ingById[u].amount)} ${esc(ingById[u].name)}</button>`).join('')}</div>` : ''}
-            <div class="step-tools">
-              ${s.minutes ? `<button class="ghost" data-timer="${n}">Starta ${fmtMin(s.minutes)}-timer</button>` : ''}
-              <button class="ghost" data-done="${n}">${S.doneSteps[n] ? 'Ångra klar' : 'Klar'}</button>
-            </div>
-          </li>`).join('')}</ol>
-        ${saved ? notesBox(saved) : ''}
-      </div>
-    </section>
-  </div>`;
+  </header>
+
+  <nav class="r-jump" aria-label="Hoppa till">
+    <button data-jump="r-ing" class="on">Ingredienser <span>${checkedCount}/${r.ingredients.length}</span></button>
+    <button data-jump="r-steps">Gör så här <span>${doneCount}/${r.steps.length}</span></button>
+  </nav>
+
+  <section class="r-sec ingredients" id="r-ing" aria-label="Ingredienser">
+    <div class="sec-head"><h2>Ingredienser</h2><span class="muted">${esc(r.servings)} portioner · bocka av det du tagit fram</span></div>
+    ${groups.map(g => `<div class="ing-group">${g.name ? `<h3 class="group-label">${esc(g.name)}</h3>` : ''}
+      ${g.items.map(i => `<label class="ing ${S.checked[i.id] ? 'checked' : ''}" data-ing="${esc(i.id)}">
+        <input type="checkbox" ${S.checked[i.id] ? 'checked' : ''} data-check="${esc(i.id)}">
+        <span class="amt">${esc(i.amount)}</span>
+        <span><span class="name">${esc(i.name)}</span>${i.note ? ` <span class="note">${esc(i.note)}</span>` : ''}</span>
+      </label>`).join('')}</div>`).join('')}
+    <button class="btn start-cook" data-startcook>Allt är framme – börja laga</button>
+  </section>
+
+  <section class="r-sec steps" id="r-steps" aria-label="Gör så här">
+    <div class="sec-head"><h2>Gör så här</h2><span class="muted">Tryck på ett steg för att markera var du är</span></div>
+    <ol>${r.steps.map((s, n) => `
+      <li class="step ${S.activeStep === n ? 'active' : ''} ${S.doneSteps[n] ? 'done' : ''}" data-step="${n}">
+        <div class="step-text">${highlightAmounts(s.text)}</div>
+        <div class="step-tools">
+          ${s.minutes ? `<button class="ghost" data-timer="${n}">⏱ ${fmtMin(s.minutes)}</button>` : ''}
+          <button class="ghost" data-done="${n}">${S.doneSteps[n] ? 'Ångra' : 'Klar'}</button>
+        </div>
+      </li>`).join('')}</ol>
+  </section>
+
+  ${r.health || r.tips?.length ? `<section class="r-sec extras">
+    ${r.health ? `<div class="health"><h3>${esc(healthLabel())}</h3>${r.health.summary ? `<div>${md(r.health.summary)}</div>` : ''}
+      ${r.health.tips?.length ? `<ul>${r.health.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>` : ''}
+    ${r.tips?.length ? `<div class="tips"><h3>Kockens tips</h3><ul>${r.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
+  </section>` : ''}
+  ${saved ? `<section class="r-sec">${notesBox(saved)}</section>` : ''}
+  </article>`;
 }
 const fmtMin = m => m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
 function notesBox(saved) {
@@ -909,7 +913,7 @@ function bindStage() {
     homeAsk.onsubmit = e => {
       e.preventDefault();
       const v = $('#homeInput').value, img = S.homeAttach; S.homeAttach = null;
-      send(v || (img ? 'Det här har vi hemma. Ge förslag.' : ''), img);
+      send(v || (img ? 'Det här har vi hemma. Ge förslag.' : ''), img, { flow: true });
     };
     $('#homeInput').onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) homeAsk.requestSubmit(); };
     $('#homeFile').onchange = async e => {
@@ -939,16 +943,17 @@ const touch = r => { r.updatedAt = now(); };
 $('#stage').addEventListener('click', async e => {
   const t = e.target;
   const q = t.closest('[data-quick]');
-  if (q) { send(q.dataset.quick); return; }
+  if (q) { send(q.dataset.quick, null, { flow: true }); return; }
   const pick = t.closest('[data-pick]');
-  if (pick) { const s = S.current.suggestions[+pick.dataset.pick]; send(`Ge mig det kompletta receptet på ${s.name}.`); return; }
-  if (t.closest('[data-more]')) { send('Ge mig fler förslag, gärna åt ett annat håll.'); return; }
+  if (pick) { const s = S.current.suggestions[+pick.dataset.pick]; send(`Ge mig det kompletta receptet på ${s.name}.`, null, { flow: true }); return; }
+  if (t.closest('[data-more]')) { send('Ge mig fler förslag, gärna åt ett annat håll.', null, { flow: true }); return; }
 
   // Recept
   const chk = t.closest('[data-check]');
   if (chk) { S.checked[chk.dataset.check] = chk.checked; const row = chk.closest('.ing'); row.classList.toggle('checked', chk.checked); updateCount(); return; }
-  const lite = t.closest('[data-lite]');
-  if (lite) { e.stopPropagation(); flashIngredient(lite.dataset.lite); return; }
+  const jump = t.closest('[data-jump]');
+  if (jump) { scrollToSec(jump.dataset.jump); return; }
+  if (t.closest('[data-startcook]')) { if (S.activeStep == null) S.activeStep = 0; refreshSteps(); scrollToSec('r-steps'); return; }
   const tm = t.closest('[data-timer]');
   if (tm) { const s = S.current.recipe.steps[+tm.dataset.timer]; startTimer(`Steg ${+tm.dataset.timer + 1}`, s.minutes); return; }
   const dn = t.closest('[data-done]');
@@ -958,7 +963,7 @@ $('#stage').addEventListener('click', async e => {
   if (t.closest('[data-save]')) { saveRecipe(); return; }
   if (t.closest('[data-cooked]')) { const r = savedRecipe(); r.cooked = [...(r.cooked || []), now()]; touch(r); saveData(); toast('Antecknat! Sätt gärna betyg och skriv vad som blev bra.'); renderStage(); const n = $('#notes'); if (n) n.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   const rate = t.closest('[data-rate]');
-  if (rate) { const r = savedRecipe(); r.rating = r.rating === +rate.dataset.rate ? 0 : +rate.dataset.rate; touch(r); saveData(); const sc = $('.pane.steps')?.scrollTop || 0; renderStage(); const p = $('.pane.steps'); if (p) p.scrollTop = sc; return; }
+  if (rate) { const r = savedRecipe(); r.rating = r.rating === +rate.dataset.rate ? 0 : +rate.dataset.rate; touch(r); saveData(); const sc = $('#stage').scrollTop; renderStage(); $('#stage').scrollTop = sc; return; }
   if (t.closest('[data-delete]')) {
     const r = savedRecipe();
     if (r && confirm(`Ta bort "${r.title}" ur kockboken?`)) {
@@ -1021,15 +1026,30 @@ function readSyncFields() {
   ['ghToken', 'gistId'].forEach(k => { const el = document.getElementById(k); if (el) S.settings[k] = el.value.trim(); });
 }
 function updateCount() {
-  const r = S.current.recipe; const c = $('.ingredients .count');
-  if (c) c.textContent = `${r.ingredients.filter(i => S.checked[i.id]).length}/${r.ingredients.length} framme`;
+  const r = S.current.recipe; if (!r) return;
+  const [a, b] = document.querySelectorAll('.r-jump span');
+  if (a) a.textContent = `${r.ingredients.filter(i => S.checked[i.id]).length}/${r.ingredients.length}`;
+  if (b) b.textContent = `${r.steps.filter((_, n) => S.doneSteps[n]).length}/${r.steps.length}`;
 }
+function scrollToSec(id) {
+  const el = document.getElementById(id), st = $('#stage'), nav = $('.r-jump');
+  if (!el) return;
+  const top = el.getBoundingClientRect().top - st.getBoundingClientRect().top + st.scrollTop - (nav ? nav.offsetHeight + 8 : 0);
+  st.scrollTo({ top, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+$('#stage').addEventListener('scroll', () => {
+  const nav = $('.r-jump'); if (!nav) return;
+  const steps = document.getElementById('r-steps');
+  const inSteps = steps && steps.getBoundingClientRect().top - $('#stage').getBoundingClientRect().top < nav.offsetHeight + 80;
+  nav.querySelectorAll('[data-jump]').forEach(b => b.classList.toggle('on', (b.dataset.jump === 'r-steps') === !!inSteps));
+}, { passive: true });
 function refreshSteps() {
   document.querySelectorAll('.step').forEach(li => {
     const n = +li.dataset.step;
     li.classList.toggle('active', S.activeStep === n); li.classList.toggle('done', !!S.doneSteps[n]);
-    const b = li.querySelector('[data-done]'); if (b) b.textContent = S.doneSteps[n] ? 'Ångra klar' : 'Klar';
+    const b = li.querySelector('[data-done]'); if (b) b.textContent = S.doneSteps[n] ? 'Ångra' : 'Klar';
   });
+  updateCount();
   const a = document.querySelector('.step.active');
   if (a) a.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
