@@ -51,7 +51,7 @@ const LEGACY_PROFILE = `Familj på 4: pappa, mamma och två tonåringar (13–15
 Pappa: periodisk fasta och styrketräning, vill gå ner i vikt men äta mycket protein ("Pappas val").
 Vi bor på Ekerö utanför Stockholm och handlar i vanliga svenska matbutiker.`;
 
-const DEFAULT_INSTRUCTIONS = `ROLL
+const INSTRUCTIONS_V2 = `ROLL
 Du är vår personliga kockcoach och receptgranskare. Ton, kunskapsnivå, portioner, utrustning, kök och hälsomål styrs av INSTÄLLNINGAR nedan – följ dem.
 
 DAG & TID
@@ -66,8 +66,29 @@ DINA TRE ARBETSLÄGEN
 
 Om viktig information saknas (t.ex. allergier), ställ en motfråga direkt.`;
 
-const DEFAULT_PROFILE = `Två vuxna och två tonåringar (13–15 år). Vi bor på Ekerö och handlar i vanliga svenska matbutiker.
+const DEFAULT_INSTRUCTIONS = `ROLL & TONALITET
+Du är vår personliga kockcoach och receptgranskare.
+Stil: Rakt på sak. Ingen "fluffig" inledning. Korta meningar.
+Kompetens: Vi är foodies med hög kunskapsnivå (särskilt inom asiatisk matlagning efter 5 år i Malaysia/Singapore). Förklara inte grunder – fokusera på teknik och smakoptimering.
+Portioner, allergier, tidsram, utrustning, kök och hälsomål styrs av INSTÄLLNINGAR nedan – följ dem. Allergier och "äter inte" får aldrig brytas.
+
+DAG & TID
+Anta att maten lagas idag om inget annat sägs. Tidsramen i INSTÄLLNINGAR är total tid inklusive förberedelser – håll dig inom den.
+- VARDAG: effektivitet, genvägar, "allt-i-ett", mindre disk.
+- HELG: "proffsvägen" för maxad smak och matlagning som hobby; nyttja specialutrustningen om INSTÄLLNINGAR säger det.
+Utgå från säsongens råvaror (se IDAG) när det passar.
+
+DINA TRE ARBETSLÄGEN
+1. Snabba köksfrågor (direkt fråga under matlagning): punktform eller max 3–5 meningar. Fokus på varför och hur – temperaturer, räddning av skurna såser, smakkombinationer.
+2. Receptbearbetning (delat recept/länk eller vald rätt): metriska mått (gram/liter), skala till antalet portioner i INSTÄLLNINGAR. Mängden ska stå i varje steg så vi slipper scrolla. Korta, numrerade, imperativa steg ("Rosta kryddorna", "Sila såsen"). Missa inga kritiska moment. Hälsoanalys utifrån hälsomålet; tillåt fett/kalorier som ger hög smakutdelning ("Flavor ROI") – smak går före total asketism, maten får aldrig bli tråkig.
+3. Inspiration (vi listar råvaror och vill ha förslag): 5–8 förslag, var och en med en kort förklaring till varför den passar just oss. Vardag: mest snabba/enkla. Helg: mer ambitiösa. Sprid över våra favoritkök, minst ett vegetariskt och minst ett tydligt hälsosammare förslag. Avsluta med att fråga vilken rätt vi vill ha komplett recept på.
+
+Om viktig information saknas, ställ en motfråga direkt.`;
+
+const DEFAULT_PROFILE_V2 = `Två vuxna och två tonåringar (13–15 år). Vi bor på Ekerö och handlar i vanliga svenska matbutiker.
 Allergier: inga kända.`;
+
+const DEFAULT_PROFILE = `Två vuxna och två tonåringar (13–15 år). Vi bor på Ekerö och handlar i vanliga svenska matbutiker.`;
 
 const OPT = {
   eaters: ['Tonåringar', 'Småbarn', 'Tränande / idrottare', 'Kräsna ätare', 'Storätare', 'Gäster / vänner', 'Bara vuxna'],
@@ -94,15 +115,14 @@ const OPT = {
   time: [['snabbt', 'Snabbt', 'Max 20–30 min, minimal disk'], ['standard', 'Standard', 'Anpassat efter dagen'], ['gott', 'Gott om tid', 'Ambitiöst, hantverk och omsorg']],
   sugg: [['3-5', '3–5'], ['5-8', '5–8'], ['8-10', '8–10']],
 };
+const TIMES = [['20', '20 min'], ['30', '30 min'], ['45', '45 min'], ['60', '1 h'], ['120', '2 h'], ['lang', 'Hela eftermiddagen']];
+const timeLabel = k => (TIMES.find(x => x[0] === k) || [, k])[1];
+const DEFAULT_HEALTH = 'Volym + spets: mättande grönt som bas och en smakspets ovanpå. Högt protein. Periodisk fasta och styrketräning, mål viktminskning.';
 const DEFAULT_PREFS = {
-  portions: 4, bigEaters: true, eaters: ['Tonåringar', 'Tränande / idrottare'],
-  profile: 'foodie',
-  expertise: 'Foodie med hög kunskapsnivå, särskilt inom asiatisk matlagning efter 5 år i Malaysia/Singapore. Förklara inte grunder – fokusera på teknik och smakoptimering.',
-  tone: 'rakt',
-  health: ['volym', 'protein'], healthWho: 'Pappa',
-  healthNote: 'Periodisk fasta och styrketräning. Mål: viktminskning men högt proteinintag.',
-  healthyAlt: true,
-  time: 'standard', sugg: '5-8',
+  portions: 4, bigEaters: true,
+  allergies: 'Inga kända',
+  weekdayTime: '30', weekendTime: '120', weekendGear: true,
+  healthWho: 'Pappa', healthNote: DEFAULT_HEALTH, healthyAlt: true,
   cuisines: ['Svenska', 'Franska', 'Italienska', 'Amerikanska', 'Mexikanska', 'Sydamerikanska', 'Malaysiska', 'Singaporianska', 'Japanska', 'Vegetariskt med karaktär'],
   equipment: ['Matberedare', 'Airfryer / fritös', 'Slow cooker', 'Bakstål', 'Sous vide', 'Köttkvarn', 'Vakuummaskin', 'Grillpanna', 'Kolgrill', 'Wokpanna', 'Stor soppkastrull'],
   customEquipment: [],
@@ -194,7 +214,9 @@ if (!S.settings.migratedGemini) {
 if (!S.settings.migrated36) { if (!S.settings.geminiModel || /3\.8|flash-latest/.test(S.settings.geminiModel)) S.settings.geminiModel = DEFAULT_MODELS.gemini; S.settings.migrated36 = true; saveSettings(); }
 // Inställningar flyttade från prompten till klickbara val
 S.data.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), S.data.prefs || {});
-if (S.data.instructions === LEGACY_INSTRUCTIONS) S.data.instructions = DEFAULT_INSTRUCTIONS;
+if (S.data.instructions === LEGACY_INSTRUCTIONS || S.data.instructions === INSTRUCTIONS_V2) S.data.instructions = DEFAULT_INSTRUCTIONS;
+if (/^Periodisk fasta och styrketräning\. Mål: viktminskning/.test(S.data.prefs.healthNote || '')) S.data.prefs.healthNote = DEFAULT_HEALTH;
+if (S.data.profile === DEFAULT_PROFILE_V2) S.data.profile = DEFAULT_PROFILE;
 if (S.data.profile === LEGACY_PROFILE) S.data.profile = DEFAULT_PROFILE;
 if (!S.current) S.current = { suggestions: null, suggIntro: '', recipe: null, recipeSavedId: null, dirty: false };
 
@@ -233,6 +255,19 @@ const DAYS = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'l�
 function dayMode() {
   const dm = S.settings.dayMode;
   return dm && dm.date === new Date().toDateString() ? dm.mode : 'auto';
+}
+function timeOverride() {
+  const t = S.settings.timeOverride;
+  return t && t.date === new Date().toDateString() ? t.val : null;
+}
+function todayTime() {
+  const P = S.data.prefs, d = dayInfo();
+  const def = d.weekend ? P.weekendTime : P.weekdayTime;
+  const o = timeOverride();
+  return { key: o || def, label: timeLabel(o || def), manual: !!o && o !== def, def };
+}
+function season(m = new Date().getMonth()) {
+  return ['vinter', 'vinter', 'vår', 'vår', 'vår', 'sommar', 'sommar', 'sommar', 'höst', 'höst', 'höst', 'vinter'][m];
 }
 function dayInfo(d = new Date()) {
   const wd = d.getDay();
@@ -290,7 +325,7 @@ ${mem}
 ${book}
 
 ## IDAG
-Idag är det ${d.name} ${d.date}, klockan ${d.time}. Dagläge: ${d.label}${d.manual ? ' (valt manuellt)' : ''}.
+Idag är det ${d.name} ${d.date}, klockan ${d.time}. Säsong: ${season()}. Dagläge: ${d.label}${d.manual ? ' (valt manuellt)' : ''}, tidsram ${todayTime().label}.
 
 ## DET SOM VISAS PÅ SKÄRMEN
 ${onScreen}
@@ -298,24 +333,18 @@ ${onScreen}
 ${FORMAT_RULES}`;
 }
 function prefsText(d) {
-  const P = S.data.prefs;
-  const find = (list, k) => list.find(x => x[0] === k) || [];
-  const prof = find(OPT.profiles, P.profile), tone = find(OPT.tones, P.tone), time = find(OPT.time, P.time);
-  const health = P.health.map(k => find(OPT.health, k)).filter(x => x[0]).map(x => `${x[1]} (${x[2]})`);
+  const P = S.data.prefs, t = todayTime();
   const equip = [...P.equipment, ...P.customEquipment];
   return `## INSTÄLLNINGAR (styr dina svar)
-- Dagläge: ${d.label}${d.manual ? ' – valt manuellt' : ' – automatiskt efter veckodag'}
-- Tidspreferens: ${time[1]} – ${time[2]}
+- Dagläge: ${d.label}${d.manual ? ' – valt manuellt för idag' : ' – automatiskt efter veckodag'}
+- Tidsram idag: ${t.label} totalt${t.manual ? ' (valt för idag)' : ` (vår standard för ${d.weekend ? 'helg' : 'vardag'})`}
+- Specialutrustning: ${d.weekend && P.weekendGear ? 'använd gärna – det är helg och vi vill laga mat som hobby' : 'bara om det sparar tid eller disk'}
 - Portioner: ${P.portions}${P.bigEaters ? ' rejäla portioner – vi äter mycket, räkna hellre för mycket' : ''}
-- Vem äter: ${P.eaters.join(', ') || 'ej angivet'}
-- Kockprofil: ${prof[1]} – ${prof[2]}
-- Vår kunskapsnivå: ${P.expertise || 'ej angiven'}
-- Tonalitet: ${tone[1]} – ${tone[2]} Exempel på stil: "${tone[3]}"
-- Hälsomål${P.healthWho ? ` (gäller ${P.healthWho})` : ''}: ${health.join('; ') || 'inga särskilda'}${P.healthNote ? `. ${P.healthNote}` : ''}
-- Lättare alternativ: ${P.healthyAlt ? `ja – avsluta alltid receptet med hur det anpassas för ${P.healthWho || 'den'} som vill äta lättare ("health" i receptet)` : 'bara om vi ber om det'}
+- ALLERGIER OCH ÄTER INTE (får aldrig brytas): ${P.allergies || 'inga kända'}
+- Hälsomål${P.healthWho ? ` (gäller ${P.healthWho})` : ''}: ${P.healthNote || 'inga särskilda'}
+- Lättare alternativ: ${P.healthyAlt ? `ja – fyll alltid "health" med hur rätten anpassas för ${P.healthWho || 'den'} som vill äta lättare` : 'bara om vi ber om det'}
 - Favoritkök: ${P.cuisines.join(', ') || 'alla'}
-- Utrustning vi har: ${equip.join(', ') || 'vanligt hemmakök'}
-- Antal förslag i inspirationsläget: ${(find(OPT.sugg, P.sugg)[1]) || '5–8'}`;
+- Utrustning vi har: ${equip.join(', ') || 'vanligt hemmakök'}`;
 }
 function stripRecipe(r) {
   const { id, savedAt, updatedAt, notes, rating, cooked, ...rest } = r;
@@ -629,10 +658,9 @@ function renderStage() {
 function viewHome() {
   const d = dayInfo();
   const P = S.data.prefs;
-  const hint = (d.weekend
-    ? `${d.manual ? 'Helgläge' : `Det är <strong>${d.name}</strong> – helg`}. Kocken räknar med tid för ${P.equipment.includes('Kolgrill') ? 'kolgrillen, ' : ''}${P.equipment.includes('Sous vide') ? 'sous viden ' : ''}eller ett längre projekt.`
-    : `${d.manual ? 'Vardagsläge' : `Det är <strong>${d.name}</strong> – vardag`}. Kocken håller det snabbt, med lite disk.`)
-    + ` <button class="linkish" data-status>Ändra</button>`;
+  const t = todayTime();
+  const gear = d.weekend && P.weekendGear ? ['Kolgrill', 'Sous vide', 'Rökskåp', 'Pizzaugn'].filter(x => P.equipment.includes(x) || P.customEquipment.includes(x)).slice(0, 2).map(x => x.toLowerCase()) : [];
+  const hint = `${d.manual ? (d.weekend ? 'Helgläge' : 'Vardagsläge') : `Det är <strong>${d.name}</strong> – ${d.weekend ? 'helg' : 'vardag'}`}. Tidsram <strong>${t.label}</strong>${d.weekend ? (gear.length ? `, gärna ${gear.join(' eller ')}` : ', gärna ett projekt') : ', lite disk'}. <button class="linkish" data-status>Ändra</button>`;
   const recent = S.data.recipes.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 4);
   if (S.busy === 'flow') {
     return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Kocken tänker…</span></div></section>`;
@@ -654,7 +682,7 @@ function viewHome() {
     </form>
     <div class="quick">
       ${[
-        d.weekend ? 'Helgprojekt på kolgrillen ikväll' : 'Snabb vardagsmiddag på 30 min',
+        d.weekend ? 'Helgprojekt ikväll' : `Snabb middag på ${todayTime().label}`,
         'Nyttigt men gott – Pappas val',
         'Vegetariskt med tydlig karaktär',
         'Något malaysiskt eller singaporianskt',
@@ -831,39 +859,35 @@ function viewBook() {
 function prefsCards() {
   const P = S.data.prefs;
   const chip = (key, val, label = val) => `<button type="button" class="chip opt" data-ptoggle="${key}" data-val="${esc(val)}" aria-pressed="${P[key].includes(val)}">${esc(label)}</button>`;
-  const card = (key, [k, title, desc, ex]) => `<button type="button" class="opt-card" data-pset="${key}" data-val="${k}" aria-pressed="${P[key] === k}"><strong>${esc(title)}</strong><span>${esc(desc)}</span>${ex ? `<em>”${esc(ex)}”</em>` : ''}</button>`;
+  const seg = (key, opts) => `<div class="seg wrap" role="group">${opts.map(([k, l]) => `<button type="button" data-pset="${key}" data-val="${k}" aria-pressed="${P[key] === k}">${l}</button>`).join('')}</div>`;
   return `
     <div class="card">
       <h2>Hushållet</h2>
-      <p>Hur många ni är och vilka som äter. Ändringar sparas direkt.</p>
       <div class="field"><label>Portioner</label>
         <div class="row"><div class="stepper"><button type="button" data-portions="-1" aria-label="Färre portioner">−</button><output>${P.portions}</output><button type="button" data-portions="1" aria-label="Fler portioner">+</button></div>
         <button type="button" class="chip opt" data-pbool="bigEaters" aria-pressed="${P.bigEaters}">Vi äter mycket – räkna rejält</button></div></div>
-      <div class="field"><label>Vem äter maten?</label><div class="chips">${OPT.eaters.map(v => chip('eaters', v)).join('')}</div></div>
-      <div class="field"><label for="profile">Övrigt om familjen</label><textarea id="profile" data-ptext="profile" rows="3" style="min-height:90px">${esc(S.data.profile)}</textarea><span class="hint">Allergier, sådant någon inte äter, var ni handlar.</span></div>
+      <div class="field"><label for="allergies">Allergier och äter inte</label><input id="allergies" data-ptext="allergies" value="${esc(P.allergies)}" placeholder="T.ex. nötter, koriander (Sara), inga svampar till barnen"><span class="hint">Kocken bryter aldrig mot det här.</span></div>
+      <div class="field"><label for="profile">Övrigt om familjen</label><textarea id="profile" data-ptext="profile" rows="2" style="min-height:70px">${esc(S.data.profile)}</textarea></div>
     </div>
 
     <div class="card">
-      <h2>Kockprofil och ton</h2>
-      <p>Vilken sorts kock ni är och hur instruktionerna ska låta.</p>
-      <div class="field"><label>Kockprofil</label><div class="opt-grid">${OPT.profiles.map(o => card('profile', o)).join('')}</div></div>
-      <div class="field"><label for="expertise">Kunskapsnivå och bakgrund</label><textarea id="expertise" data-ptext="expertise" rows="3" style="min-height:80px">${esc(P.expertise)}</textarea></div>
-      <div class="field"><label>Tonalitet</label><div class="opt-grid">${OPT.tones.map(o => card('tone', o)).join('')}</div></div>
+      <h2>Vardag och helg</h2>
+      <p>Vad dagarna betyder för er. Snabbvalet uppe till höger väljer vilken som gäller idag – automatiskt efter veckodag – och där kan du också ändra tiden för stunden.</p>
+      <div class="day-cols">
+        <div class="day-col"><h3>Vardag <span class="muted">mån–tor</span></h3>
+          <div class="field"><label>Tidsram</label>${seg('weekdayTime', TIMES.slice(0, 3))}</div>
+          <p class="hint">Genvägar, allt-i-ett och lite disk.</p></div>
+        <div class="day-col"><h3>Helg <span class="muted">fre–sön</span></h3>
+          <div class="field"><label>Tidsram</label>${seg('weekendTime', TIMES.slice(3))}</div>
+          <button type="button" class="chip opt" data-pbool="weekendGear" aria-pressed="${P.weekendGear}">Använd gärna specialutrustningen</button></div>
+      </div>
     </div>
 
     <div class="card">
       <h2>Hälsomål</h2>
-      <p>Styr hälsoanalysen i recepten och det nyttigare förslaget i inspirationen.</p>
-      <div class="opt-grid">${OPT.health.map(([k, t, d]) => `<button type="button" class="opt-card" data-ptoggle="health" data-val="${k}" aria-pressed="${P.health.includes(k)}"><strong>${esc(t)}</strong><span>${esc(d)}</span></button>`).join('')}</div>
-      <div class="field" style="margin-top:14px"><label for="healthWho">Vem gäller målen?</label><input id="healthWho" data-ptext="healthWho" value="${esc(P.healthWho)}" placeholder="T.ex. Pappa, alla"></div>
-      <div class="field"><label for="healthNote">Eget kostmål</label><textarea id="healthNote" data-ptext="healthNote" rows="2" style="min-height:70px">${esc(P.healthNote)}</textarea></div>
-      <button type="button" class="chip opt" data-pbool="healthyAlt" aria-pressed="${P.healthyAlt}">Avsluta alltid med ett lättare alternativ</button>
-    </div>
-
-    <div class="card">
-      <h2>Tid och förslag</h2>
-      <div class="field"><label>Tidspreferens</label><div class="opt-grid three">${OPT.time.map(o => card('time', o)).join('')}</div><span class="hint">Vardag eller helg väljs automatiskt efter veckodag. Det går att ändra tillfälligt via knappen uppe till höger.</span></div>
-      <div class="field"><label>Antal förslag i inspirationen</label><div class="seg" role="group">${OPT.sugg.map(([k, l]) => `<button type="button" data-pset="sugg" data-val="${k}" aria-pressed="${P.sugg === k}">${l}</button>`).join('')}</div></div>
+      <div class="field"><label for="healthWho">Gäller</label><input id="healthWho" data-ptext="healthWho" value="${esc(P.healthWho)}" placeholder="T.ex. Pappa, alla"></div>
+      <div class="field"><label for="healthNote">Målet med egna ord</label><textarea id="healthNote" data-ptext="healthNote" rows="3" style="min-height:80px">${esc(P.healthNote)}</textarea></div>
+      <button type="button" class="chip opt" data-pbool="healthyAlt" aria-pressed="${P.healthyAlt}">Avsluta alltid receptet med ett lättare alternativ</button>
     </div>
 
     <div class="card">
@@ -874,7 +898,6 @@ function prefsCards() {
 
     <div class="card">
       <h2>Köksutrustning</h2>
-      <p>Kocken planerar tekniken efter det ni har.</p>
       <div class="chips">${OPT.equipment.map(v => chip('equipment', v)).join('')}${P.customEquipment.map(v => `<button type="button" class="chip opt" data-premove="${esc(v)}" aria-pressed="true" title="Tryck för att ta bort">${esc(v)} ×</button>`).join('')}</div>
       <div class="row" style="margin-top:12px"><input id="equipNew" class="search" placeholder="Lägg till egen, t.ex. Kamado" style="max-width:none"><button class="ghost" data-equipadd>Lägg till</button></div>
     </div>`;
@@ -1109,10 +1132,9 @@ function prefsChanged(quiet) {
 
 /* ============ Statusrad / snabbval ============ */
 function statusLabel() {
-  const d = dayInfo(), P = S.data.prefs;
-  const time = (OPT.time.find(x => x[0] === P.time) || [])[1];
-  const tone = (OPT.tones.find(x => x[0] === P.tone) || [])[1];
-  return { short: `${d.weekend ? 'Helg' : 'Vardag'} · ${P.portions}`, long: `${d.weekend ? 'Helg' : 'Vardag'}${d.manual ? '' : ' (auto)'} · ${P.portions} port · ${time} · ${tone}` };
+  const d = dayInfo(), P = S.data.prefs, t = todayTime();
+  const day = d.weekend ? 'Helg' : 'Vardag';
+  return { short: `${day} · ${t.label}`, long: `${day}${d.manual ? '' : ' (auto)'} · ${t.label} · ${P.portions} port` };
 }
 function renderStatus() {
   const b = $('#statusBtn'); if (!b) return;
@@ -1122,10 +1144,12 @@ function renderStatus() {
   if (!pop.hidden) pop.innerHTML = statusPopHtml();
 }
 function statusPopHtml() {
-  const P = S.data.prefs, m = dayMode();
-  return `<div class="field"><label>Dag</label><div class="seg" role="group">${[['auto', 'Auto'], ['vardag', 'Vardag'], ['helg', 'Helg']].map(([k, l]) => `<button type="button" data-day="${k}" aria-pressed="${m === k}">${l}</button>`).join('')}</div><span class="hint">Gäller resten av dagen.</span></div>
-    <div class="field"><label>Tid</label><div class="seg" role="group">${OPT.time.map(([k, l]) => `<button type="button" data-pset="time" data-val="${k}" aria-pressed="${P.time === k}">${l}</button>`).join('')}</div></div>
+  const P = S.data.prefs, m = dayMode(), d = dayInfo(), t = todayTime();
+  return `<div class="field"><label>Idag är det</label><div class="seg" role="group">${[['auto', `Auto (${dayInfo(new Date()).name.slice(0, 3)})`], ['vardag', 'Vardag'], ['helg', 'Helg']].map(([k, l]) => `<button type="button" data-day="${k}" aria-pressed="${m === k}">${l}</button>`).join('')}</div></div>
+    <div class="field"><label>Tid idag</label><div class="chips">${TIMES.map(([k, l]) => `<button type="button" class="chip opt" data-time="${k}" aria-pressed="${t.key === k}">${l}${k === t.def ? ' ·&nbsp;standard' : ''}</button>`).join('')}</div>
+      <span class="hint">${d.weekend ? 'Helg' : 'Vardag'}ens standard är ${timeLabel(t.def)}. Ändras under Inställningar.</span></div>
     <div class="field"><label>Portioner</label><div class="stepper"><button type="button" data-portions="-1" aria-label="Färre portioner">−</button><output>${P.portions}</output><button type="button" data-portions="1" aria-label="Fler portioner">+</button></div></div>
+    <p class="hint" style="margin:0 0 10px">Dag och tid gäller resten av dagen, sedan automatiskt igen. Portioner sparas tills du ändrar.</p>
     <button class="ghost small" data-go="settings">Alla inställningar</button>`;
 }
 function toggleStatusPop(open) {
@@ -1139,7 +1163,9 @@ $('#statusPop').addEventListener('click', e => {
   e.stopPropagation();
   const t = e.target;
   const dd = t.closest('[data-day]');
-  if (dd) { S.settings.dayMode = { mode: dd.dataset.day, date: new Date().toDateString() }; saveSettings(); renderStatus(); if (S.route.view === 'home') renderStage(); return; }
+  if (dd) { S.settings.dayMode = { mode: dd.dataset.day, date: new Date().toDateString() }; S.settings.timeOverride = null; saveSettings(); renderStatus(); if (['home', 'settings'].includes(S.route.view)) renderStage(); return; }
+  const tm = t.closest('[data-time]');
+  if (tm) { const v = tm.dataset.time; S.settings.timeOverride = v === todayTime().def ? null : { val: v, date: new Date().toDateString() }; saveSettings(); renderStatus(); if (S.route.view === 'home') renderStage(); return; }
   const ps = t.closest('[data-pset]');
   if (ps) { S.data.prefs[ps.dataset.pset] = ps.dataset.val; prefsChanged(true); if (S.route.view === 'settings') renderStage(); return; }
   const pp = t.closest('[data-portions]');
