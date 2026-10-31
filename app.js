@@ -352,7 +352,7 @@ async function callModel(onProgress = () => {}) {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: mkBody(thinking) });
       } catch (e) { throw new Error('Kunde inte nå Google (nätverksfel). Kontrollera internetuppkopplingen.'); }
       if (res.ok) {
-        if (model !== S.settings.geminiModel) { S.settings.geminiModel = model; saveSettings(); }
+        if (model !== S.settings.geminiModel && !/överbelastad|kvot/.test(lastErr)) { S.settings.geminiModel = model; saveSettings(); }
         const reader = res.body.getReader(); const dec = new TextDecoder();
         let buf = '', txt = '', finish = '';
         for (;;) {
@@ -381,13 +381,15 @@ async function callModel(onProgress = () => {}) {
       console.warn('Gemini', model, res.status, status, msg);
       if (res.status === 400 && thinking && /think/i.test(msg)) { thinking = null; continue; }  // modellen godtar inte nivån
       lastErr = `${model}: ${msg}`;
-      if (res.status === 404 || res.status === 429 || /not found|not supported|no longer available|ACCESS_TOKEN_TYPE_UNSUPPORTED/i.test(msg + status)) break;
+      // Överbelastad (503/500) eller kvot slut (429): prova nästa modell direkt
+      if (res.status === 503 || res.status === 500 || res.status === 429 || /UNAVAILABLE|high demand|overloaded|RESOURCE_EXHAUSTED/i.test(msg + status)) { lastErr = res.status === 429 ? `${model}: dagens gratiskvot är slut` : `${model}: överbelastad just nu`; break; }
+      if (res.status === 404 || /not found|not supported|no longer available|ACCESS_TOKEN_TYPE_UNSUPPORTED/i.test(msg + status)) break;
       if (res.status === 400 && /API key not valid|API_KEY_INVALID/i.test(msg + JSON.stringify(j))) throw new Error('Google säger att nyckeln är ogiltig. Kopiera den igen från aistudio.google.com/apikey och spara på nytt.');
       if (res.status === 403) throw new Error('Nyckeln saknar behörighet (403): ' + msg + ' – skapa en ny nyckel i AI Studio.');
       throw new Error(lastErr);
     }
   }
-  throw new Error('Ingen Gemini-modell svarade. Senaste fel – ' + lastErr);
+  throw new Error('Googles gratismodeller är överbelastade just nu (' + lastErr + '). Vänta en minut och försök igen.');
 }
 function mergeRoles(msgs) {
   // API:erna vill ha alternerande roller och börja med user
