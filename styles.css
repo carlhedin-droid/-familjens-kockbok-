@@ -431,3 +431,5 @@ details.adv[open] summary { margin-bottom: 8px; }
 .flag { width: 22px; height: 16px; object-fit: cover; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,.12); vertical-align: -2px; }
 .sugg .origin { font-size: 15px; }
 .book-row h3 .origin { margin-right: 8px; vertical-align: 1px; }
+
+.status-line { display: block; margin-top: 4px; color: var(--ink); font-weight: 700; }

@@ -883,38 +883,11 @@ function prefsCards() {
 function viewSettings() {
   const s = S.settings, p = s.provider;
   const mem = S.data.memory.filter(m => !m.deleted);
+  const keyField = p === 'claude' ? 'claudeKey' : 'geminiKey';
+  const ai = S.aiStatus || (s[keyField] ? '' : 'Ingen nyckel ännu');
+  const sync = !s.ghToken ? 'Av – kockboken finns bara på den här enheten' : (S.sync.state === 'Synkad' ? `✓ På – ${$('#sync').title || 'synkad'}` : S.sync.state || 'Kopplar…');
   return `<section class="settings">
     <h1>Inställningar</h1>
-    <div class="card">
-      <h2>Kockens AI</h2>
-      <p>Appen pratar direkt med AI-tjänsten med er egen nyckel. Nyckeln sparas bara i den här webbläsaren.</p>
-      <div class="field"><label>Tjänst</label>
-        <div class="seg" role="group"><button type="button" data-prov="gemini" aria-pressed="${p === 'gemini'}">Google Gemini</button><button type="button" data-prov="claude" aria-pressed="${p === 'claude'}">Anthropic Claude</button></div></div>
-      ${p === 'gemini' ? `
-        <div class="field"><label for="geminiKey">Gemini API-nyckel</label><input id="geminiKey" type="password" autocomplete="off" value="${esc(s.geminiKey)}">
-          <span class="hint">Gratis: skapa en nyckel på <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. På gratisnivån får Google använda frågorna för att förbättra sina tjänster.</span></div>
-        <div class="field"><label for="geminiModel">Modell</label><input id="geminiModel" value="${esc(s.geminiModel)}"><span class="hint">Standard: ${DEFAULT_MODELS.gemini}</span></div>`
-      : `
-        <div class="field"><label for="claudeKey">Claude API-nyckel</label><input id="claudeKey" type="password" autocomplete="off" value="${esc(s.claudeKey)}">
-          <span class="hint">Skapa en nyckel på <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> (betalas per användning).</span></div>
-        <div class="field"><label for="claudeModel">Modell</label><input id="claudeModel" value="${esc(s.claudeModel)}"><span class="hint">Standard: ${DEFAULT_MODELS.claude}</span></div>`}
-      <div class="row"><button class="btn" data-savekeys>Spara</button><button class="ghost" data-testai>Testa kocken</button></div>
-    </div>
-
-    <div class="card">
-      <h2>Dela kockboken mellan enheter</h2>
-      <p>Kockboken, smakminnet och instruktionerna sparas i en privat GitHub Gist så att dator, mobil och platta – och båda föräldrarna – ser samma sak.</p>
-      <div class="field"><label for="ghToken">GitHub-token</label><input id="ghToken" type="password" autocomplete="off" value="${esc(s.ghToken)}">
-        <span class="hint">Skapa en <a href="https://github.com/settings/tokens/new?scopes=gist&description=Familjens%20kockbok" target="_blank" rel="noopener">klassisk token med bara behörigheten "gist"</a>.</span></div>
-      <div class="field"><label for="gistId">Gist-id</label><input id="gistId" value="${esc(s.gistId)}" placeholder="Lämna tomt och tryck Skapa för att starta en ny">
-      </div>
-      <div class="row">
-        ${s.gistId ? `<button class="btn" data-syncnow>Synka nu</button>` : `<button class="btn" data-gistcreate>Skapa delad kockbok</button>`}
-        <button class="ghost" data-savesync>Spara</button>
-        <button class="ghost" data-sharelink>Kopiera länk för annan enhet</button>
-      </div>
-      <p class="hint muted" style="margin:10px 0 0;font-size:14px">Länken innehåller nycklarna – skicka den bara till er själva. Öppna den på den andra enheten så kopplas allt automatiskt.</p>
-    </div>
 
 ${prefsCards()}
 
@@ -925,19 +898,36 @@ ${prefsCards()}
       <div class="row"><input id="memNew" class="search" placeholder="T.ex. Vi älskar sambal" style="max-width:none"><button class="ghost" data-memadd>Lägg till</button></div>
     </div>
 
-    <details class="card adv">
-      <summary><h2>Avancerat: kockens grundinstruktioner</h2></summary>
-      <p>Hur kocken arbetar (de tre lägena). Familj, utrustning, ton och mål styrs av valen ovan och läggs till automatiskt, liksom appens svarsformat.</p>
-      <div class="field"><textarea id="instructions" class="tall" aria-label="Kockens instruktioner">${esc(S.data.instructions)}</textarea></div>
-      <div class="row"><button class="btn" data-saveinstr>Spara</button><button class="ghost" data-resetinstr>Återställ standard</button></div>
-    </details>
-
     <div class="card">
-      <h2>Utseende och data</h2>
+      <h2>Koppling</h2>
+      <p>Görs en gång per enhet. Nycklarna sparas bara i webbläsaren.</p>
+      <div class="field"><label for="${keyField}">${p === 'claude' ? 'Claude-nyckel' : 'Gemini-nyckel (gratis)'}</label>
+        <input id="${keyField}" type="password" autocomplete="off" value="${esc(s[keyField])}" placeholder="Klistra in nyckeln">
+        <span class="hint">${p === 'claude' ? 'Från <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.' : 'Hämtas på <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.'}${ai ? ` <strong class="status-line">${esc(ai)}</strong>` : ''}</span></div>
+      <div class="field"><label for="ghToken">GitHub-token för att dela kockboken <span class="muted">(valfritt)</span></label>
+        <input id="ghToken" type="password" autocomplete="off" value="${esc(s.ghToken)}" placeholder="ghp_…">
+        <span class="hint">Behövs bara om fler enheter ska se samma kockbok. <a href="https://github.com/settings/tokens/new?scopes=gist&description=Familjens%20kockbok" target="_blank" rel="noopener">Skapa token</a> (bara behörigheten "gist"). <strong class="status-line">${esc(sync)}</strong></span></div>
+      <div class="row"><button class="btn" data-connect>Spara och testa</button>
+        ${s[keyField] ? `<button class="ghost" data-sharelink>Kopiera länk till annan enhet</button>` : ''}</div>
+      ${s[keyField] ? `<p class="hint muted" style="margin:10px 0 0;font-size:14px">Öppna länken på mobilen eller plattan så kopplas den automatiskt. Länken innehåller nycklarna – skicka den bara till er själva.</p>` : ''}
+    </div>
+
+    <details class="card adv">
+      <summary><h2>Avancerat</h2></summary>
+      <div class="field"><label>AI-tjänst</label>
+        <div class="seg" role="group"><button type="button" data-prov="gemini" aria-pressed="${p === 'gemini'}">Google Gemini</button><button type="button" data-prov="claude" aria-pressed="${p === 'claude'}">Anthropic Claude</button></div></div>
+      <div class="field"><label for="${p === 'claude' ? 'claudeModel' : 'geminiModel'}">Modell</label><input id="${p === 'claude' ? 'claudeModel' : 'geminiModel'}" value="${esc(p === 'claude' ? s.claudeModel : s.geminiModel)}">
+        <span class="hint">Standard: ${DEFAULT_MODELS[p]}.${p === 'gemini' ? ' Är modellen upptagen provar appen andra gratismodeller automatiskt.' : ''}</span></div>
+      <div class="field"><label for="gistId">Gist-id för delad kockbok</label><input id="gistId" value="${esc(s.gistId)}" placeholder="Hittas eller skapas automatiskt"></div>
+      <div class="row" style="margin-bottom:18px"><button class="ghost" data-savekeys>Spara</button>${s.gistId ? `<button class="ghost" data-syncnow>Synka nu</button>` : ''}</div>
+      <div class="field"><label for="instructions">Kockens grundinstruktioner</label>
+        <textarea id="instructions" class="tall">${esc(S.data.instructions)}</textarea>
+        <span class="hint">Hur kocken arbetar. Familj, utrustning och mål ovan läggs till automatiskt, liksom appens svarsformat.</span></div>
+      <div class="row" style="margin-bottom:18px"><button class="ghost" data-saveinstr>Spara instruktioner</button><button class="ghost" data-resetinstr>Återställ standard</button></div>
       <div class="field"><label>Tema</label><div class="seg" role="group">${[['auto', 'Som enheten'], ['light', 'Ljust'], ['dark', 'Mörkt']].map(([k, l]) => `<button type="button" data-theme="${k}" aria-pressed="${s.theme === k}">${l}</button>`).join('')}</div></div>
       <div class="row"><button class="ghost" data-export>Ladda ner säkerhetskopia</button>
         <label class="ghost">Läs in säkerhetskopia<input type="file" accept="application/json" id="importFile" hidden></label></div>
-    </div>
+    </details>
   </section>`;
 }
 
@@ -1037,6 +1027,7 @@ $('#stage').addEventListener('click', async e => {
   const prov = t.closest('[data-prov]');
   if (prov) { readKeyFields(); S.settings.provider = prov.dataset.prov; saveSettings(); renderStage(); return; }
   if (t.closest('[data-savekeys]')) { readKeyFields(); saveSettings(); toast('Sparat'); return; }
+  if (t.closest('[data-connect]')) { readKeyFields(); readSyncFields(); saveSettings(); connectAll(); return; }
   if (t.closest('[data-testai]')) { readKeyFields(); saveSettings(); openChat(true); send('Snabbtest: svara med en mening om vad du kan hjälpa oss med ikväll.'); return; }
   if (t.closest('[data-savesync]')) { readSyncFields(); saveSettings(); toast('Sparat'); if (S.settings.gistId) syncNow(); return; }
   if (t.closest('[data-gistcreate]')) { readSyncFields(); saveSettings(); createGist(); return; }
@@ -1211,6 +1202,34 @@ function gh(path, opts = {}) {
   return fetch('https://api.github.com' + path, {
     ...opts, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${S.settings.ghToken}`, 'X-GitHub-Api-Version': '2022-11-28', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
   });
+}
+async function testAI() {
+  const p = S.settings.provider;
+  if (!S.settings[p === 'claude' ? 'claudeKey' : 'geminiKey']) return 'Ingen nyckel ännu';
+  const sysBackup = S.chat; S.chat = [{ role: 'user', text: 'Test: svara bara med reply "OK".' }];
+  try { await callModel(); return '✓ Kocken svarar'; }
+  catch (e) { return '✗ ' + (e.message === 'NOKEY' ? 'Ingen nyckel' : e.message); }
+  finally { S.chat = sysBackup; }
+}
+async function findOrCreateGist() {
+  try {
+    const res = await gh('/gists?per_page=100');
+    if (res.ok) {
+      const list = await res.json();
+      const g = list.find(x => x.files && x.files[DATA_FILE]);
+      if (g) { S.settings.gistId = g.id; saveSettings(); await syncNow(); return; }
+    } else if (res.status === 401) { setSync('Fel token'); return; }
+  } catch { /* skapa ny nedan */ }
+  await createGist();
+}
+async function connectAll() {
+  S.aiStatus = 'Testar…'; renderStage();
+  const jobs = [testAI().then(r => { S.aiStatus = r; })];
+  if (S.settings.ghToken) jobs.push(S.settings.gistId ? syncNow() : findOrCreateGist());
+  else setSync('');
+  await Promise.all(jobs);
+  if (S.route.view === 'settings') renderStage();
+  toast(S.aiStatus.startsWith('✓') ? 'Allt är kopplat' : 'Kolla kopplingen');
 }
 async function createGist() {
   if (!S.settings.ghToken) { toast('Lägg in en GitHub-token först'); return; }
