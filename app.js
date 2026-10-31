@@ -74,6 +74,7 @@ Regler:
 - Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.`;
 
 const DEFAULT_MODELS = { gemini: 'gemini-3.8-flash', claude: 'claude-sonnet-5-5' };
+const GEMINI_FALLBACKS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
 const DATA_FILE = 'familjens-kockbok.json';
 
 /* ============ Lagring ============ */
@@ -240,23 +241,40 @@ async function callModel() {
   }
   const key = S.settings.geminiKey.trim();
   if (!key) throw new Error('NOKEY');
-  const model = S.settings.geminiModel || DEFAULT_MODELS.gemini;
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: sys }] },
-      contents: mergeRoles(msgs).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [
-        ...(m.image ? [{ inlineData: { mimeType: m.image.mime, data: m.image.data } }] : []), { text: m.text } ] })),
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.8 },
-    }),
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: sys }] },
+    contents: mergeRoles(msgs).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [
+      ...(m.image ? [{ inlineData: { mimeType: m.image.mime, data: m.image.data } }] : []), { text: m.text } ] })),
+    generationConfig: { responseMimeType: 'application/json', temperature: 0.8 },
   });
-  const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(j.error?.message || `Gemini svarade ${res.status}`);
-  const parts = j.candidates?.[0]?.content?.parts || [];
-  const txt = parts.filter(x => !x.thought).map(x => x.text || '').join('');
-  if (!txt) throw new Error('Tomt svar från Gemini (' + (j.candidates?.[0]?.finishReason || 'okänd orsak') + ')');
-  return txt;
+  // Prova vald modell först, sedan reservmodeller om den inte finns/inte ingår i gratisnivån
+  const models = [...new Set([S.settings.geminiModel || DEFAULT_MODELS.gemini, ...GEMINI_FALLBACKS])];
+  let lastErr = '';
+  for (const model of models) {
+    let res;
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body });
+    } catch (e) { throw new Error('Kunde inte nå Google (nätverksfel). Kontrollera internetuppkopplingen.'); }
+    const j = await res.json().catch(() => ({}));
+    if (res.ok) {
+      if (model !== S.settings.geminiModel) { S.settings.geminiModel = model; saveSettings(); }
+      const parts = j.candidates?.[0]?.content?.parts || [];
+      const txt = parts.filter(x => !x.thought).map(x => x.text || '').join('');
+      if (!txt) throw new Error('Tomt svar från Gemini (' + (j.candidates?.[0]?.finishReason || j.promptFeedback?.blockReason || 'okänd orsak') + ')');
+      return txt;
+    }
+    const msg = j.error?.message || `HTTP ${res.status}`;
+    const status = j.error?.status || '';
+    lastErr = `${model}: ${msg}`;
+    console.warn('Gemini', res.status, status, msg);
+    // Prova nästa modell vid "finns inte", kvot slut för just den modellen, eller misstänkt modellproblem
+    if (res.status === 404 || res.status === 429 || /not found|not supported|no longer available|ACCESS_TOKEN_TYPE_UNSUPPORTED/i.test(msg + status)) continue;
+    if (res.status === 400 && /API key not valid|API_KEY_INVALID/i.test(msg + JSON.stringify(j))) throw new Error('Google säger att nyckeln är ogiltig. Kopiera den igen från aistudio.google.com/apikey och spara på nytt.');
+    if (res.status === 403) throw new Error('Nyckeln saknar behörighet (403): ' + msg + ' – skapa en ny nyckel i AI Studio.');
+    throw new Error(lastErr);
+  }
+  throw new Error('Ingen Gemini-modell svarade. Senaste fel – ' + lastErr);
 }
 function mergeRoles(msgs) {
   // API:erna vill ha alternerande roller och börja med user
