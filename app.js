@@ -213,11 +213,14 @@ if (!S.settings.migratedGemini) {
 // 3.8 är ofta överbelastad på gratisnivån – byt till 3.6 som standard
 if (!S.settings.migrated36) { if (!S.settings.geminiModel || /3\.8|flash-latest/.test(S.settings.geminiModel)) S.settings.geminiModel = DEFAULT_MODELS.gemini; S.settings.migrated36 = true; saveSettings(); }
 // Inställningar flyttade från prompten till klickbara val
-S.data.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), S.data.prefs || {});
-if (S.data.instructions === LEGACY_INSTRUCTIONS || S.data.instructions === INSTRUCTIONS_V2) S.data.instructions = DEFAULT_INSTRUCTIONS;
-if (/^Periodisk fasta och styrketräning\. Mål: viktminskning/.test(S.data.prefs.healthNote || '')) S.data.prefs.healthNote = DEFAULT_HEALTH;
-if (S.data.profile === DEFAULT_PROFILE_V2) S.data.profile = DEFAULT_PROFILE;
-if (S.data.profile === LEGACY_PROFILE) S.data.profile = DEFAULT_PROFILE;
+function migrateData() {
+  S.data.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), S.data.prefs || {});
+  if (S.data.instructions === LEGACY_INSTRUCTIONS || S.data.instructions === INSTRUCTIONS_V2) S.data.instructions = DEFAULT_INSTRUCTIONS;
+  if (/^Periodisk fasta och styrketräning\. Mål: viktminskning/.test(S.data.prefs.healthNote || '')) S.data.prefs.healthNote = DEFAULT_HEALTH;
+  if (S.data.profile === DEFAULT_PROFILE_V2) S.data.profile = DEFAULT_PROFILE;
+  if (S.data.profile === LEGACY_PROFILE) S.data.profile = DEFAULT_PROFILE;
+}
+migrateData();
 if (!S.current) S.current = { suggestions: null, suggIntro: '', recipe: null, recipeSavedId: null, dirty: false };
 
 function saveSettings() { LS.set('fk.settings', S.settings); }
@@ -1312,6 +1315,7 @@ function mergeData(remote) {
   L.memory = [...mem.values()].sort((a, b) => (a.at || '').localeCompare(b.at || ''));
   if ((R.textUpdatedAt || '') > (L.textUpdatedAt || '')) { L.instructions = R.instructions; L.profile = R.profile; if (R.prefs) L.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), R.prefs); L.textUpdatedAt = R.textUpdatedAt; }
   L.deleted = deleted;
+  migrateData();
 }
 async function copyShareLink() {
   const payload = { geminiKey: S.settings.geminiKey, claudeKey: S.settings.claudeKey, provider: S.settings.provider, ghToken: S.settings.ghToken, gistId: S.settings.gistId };
