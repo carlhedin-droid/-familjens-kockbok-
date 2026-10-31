@@ -171,7 +171,7 @@ function buildSystem() {
   const d = dayInfo();
   const mem = S.data.memory.filter(m => !m.deleted).map(m => `- ${m.text}`).join('\n') || '- (inget ännu)';
   const book = S.data.recipes.slice()
-    .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 50)
+    .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 30)
     .map(r => {
       const bits = [];
       if (r.rating) bits.push(`betyg ${r.rating}/5`);
@@ -210,7 +210,7 @@ function stripRecipe(r) {
 
 /* ============ AI-anrop ============ */
 function historyForModel() {
-  return S.chat.filter(m => m.role === 'user' || m.role === 'assistant').slice(-24).map(m => {
+  return S.chat.filter(m => m.role === 'user' || m.role === 'assistant').slice(-16).map(m => {
     let text = m.text || '';
     if (m.role === 'assistant') {
       if (m.view?.recipe) text += `\n[Visade receptet "${m.view.recipe.title}" på skärmen]`;
@@ -219,7 +219,7 @@ function historyForModel() {
     return { role: m.role, text: text || '(tomt)', image: m.image };
   });
 }
-async function callModel() {
+async function callModel(onProgress = () => {}) {
   const sys = buildSystem();
   const msgs = historyForModel();
   const p = S.settings.provider;
@@ -241,38 +241,59 @@ async function callModel() {
   }
   const key = S.settings.geminiKey.trim();
   if (!key) throw new Error('NOKEY');
-  const body = JSON.stringify({
+  const mkBody = thinking => JSON.stringify({
     systemInstruction: { parts: [{ text: sys }] },
     contents: mergeRoles(msgs).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [
       ...(m.image ? [{ inlineData: { mimeType: m.image.mime, data: m.image.data } }] : []), { text: m.text } ] })),
-    generationConfig: { responseMimeType: 'application/json', temperature: 0.8 },
+    generationConfig: { responseMimeType: 'application/json', temperature: 0.8, ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}) },
   });
   // Prova vald modell först, sedan reservmodeller om den inte finns/inte ingår i gratisnivån
   const models = [...new Set([S.settings.geminiModel || DEFAULT_MODELS.gemini, ...GEMINI_FALLBACKS])];
   let lastErr = '';
   for (const model of models) {
-    let res;
-    try {
-      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body });
-    } catch (e) { throw new Error('Kunde inte nå Google (nätverksfel). Kontrollera internetuppkopplingen.'); }
-    const j = await res.json().catch(() => ({}));
-    if (res.ok) {
-      if (model !== S.settings.geminiModel) { S.settings.geminiModel = model; saveSettings(); }
-      const parts = j.candidates?.[0]?.content?.parts || [];
-      const txt = parts.filter(x => !x.thought).map(x => x.text || '').join('');
-      if (!txt) throw new Error('Tomt svar från Gemini (' + (j.candidates?.[0]?.finishReason || j.promptFeedback?.blockReason || 'okänd orsak') + ')');
-      return txt;
+    // Minsta tänkande = snabbast. 3.8 klarar "low", övriga "minimal".
+    let thinking = /3\.8/.test(model) ? 'low' : 'minimal';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let res;
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: mkBody(thinking) });
+      } catch (e) { throw new Error('Kunde inte nå Google (nätverksfel). Kontrollera internetuppkopplingen.'); }
+      if (res.ok) {
+        if (model !== S.settings.geminiModel) { S.settings.geminiModel = model; saveSettings(); }
+        const reader = res.body.getReader(); const dec = new TextDecoder();
+        let buf = '', txt = '', finish = '';
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf('\n')) >= 0) {
+            const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+            if (!line.startsWith('data:')) continue;
+            try {
+              const j = JSON.parse(line.slice(5));
+              const c = j.candidates?.[0];
+              (c?.content?.parts || []).forEach(p => { if (!p.thought && p.text) txt += p.text; });
+              if (c?.finishReason) finish = c.finishReason;
+              onProgress(txt);
+            } catch { /* ofullständig rad */ }
+          }
+        }
+        if (!txt) throw new Error('Tomt svar från Gemini (' + (finish || 'okänd orsak') + ')');
+        return txt;
+      }
+      const j = await res.json().catch(() => ({}));
+      const msg = j.error?.message || `HTTP ${res.status}`;
+      const status = j.error?.status || '';
+      console.warn('Gemini', model, res.status, status, msg);
+      if (res.status === 400 && thinking && /think/i.test(msg)) { thinking = null; continue; }  // modellen godtar inte nivån
+      lastErr = `${model}: ${msg}`;
+      if (res.status === 404 || res.status === 429 || /not found|not supported|no longer available|ACCESS_TOKEN_TYPE_UNSUPPORTED/i.test(msg + status)) break;
+      if (res.status === 400 && /API key not valid|API_KEY_INVALID/i.test(msg + JSON.stringify(j))) throw new Error('Google säger att nyckeln är ogiltig. Kopiera den igen från aistudio.google.com/apikey och spara på nytt.');
+      if (res.status === 403) throw new Error('Nyckeln saknar behörighet (403): ' + msg + ' – skapa en ny nyckel i AI Studio.');
+      throw new Error(lastErr);
     }
-    const msg = j.error?.message || `HTTP ${res.status}`;
-    const status = j.error?.status || '';
-    lastErr = `${model}: ${msg}`;
-    console.warn('Gemini', res.status, status, msg);
-    // Prova nästa modell vid "finns inte", kvot slut för just den modellen, eller misstänkt modellproblem
-    if (res.status === 404 || res.status === 429 || /not found|not supported|no longer available|ACCESS_TOKEN_TYPE_UNSUPPORTED/i.test(msg + status)) continue;
-    if (res.status === 400 && /API key not valid|API_KEY_INVALID/i.test(msg + JSON.stringify(j))) throw new Error('Google säger att nyckeln är ogiltig. Kopiera den igen från aistudio.google.com/apikey och spara på nytt.');
-    if (res.status === 403) throw new Error('Nyckeln saknar behörighet (403): ' + msg + ' – skapa en ny nyckel i AI Studio.');
-    throw new Error(lastErr);
   }
   throw new Error('Ingen Gemini-modell svarade. Senaste fel – ' + lastErr);
 }
@@ -308,15 +329,28 @@ function normalizeRecipe(r) {
   return r;
 }
 
+function partialReply(acc) {
+  const m = acc.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
+  if (!m) return '';
+  try { return JSON.parse('"' + m[1].replace(/\\$/, '') + '"'); } catch { return m[1].replace(/\\n/g, '\n'); }
+}
+function showProgress(acc) {
+  const what = /"recipe"\s*:\s*\{/.test(acc) ? 'Kocken skriver receptet…'
+    : /"suggestions"\s*:\s*\[/.test(acc) ? `Kocken plockar fram förslag… (${(acc.match(/"name"\s*:/g) || []).length} hittills)`
+    : 'Kocken tänker…';
+  const st = document.getElementById('stageStatus'); if (st) st.textContent = what;
+  const live = document.getElementById('liveReply');
+  const r = partialReply(acc);
+  if (live && r) { live.classList.remove('typing'); live.innerHTML = md(r); const log = $('#chatLog'); log.scrollTop = log.scrollHeight; }
+}
 async function send(text, image) {
   text = (text || '').trim();
   if ((!text && !image) || S.busy) return;
   S.chat.push({ role: 'user', text: text || 'Vad kan jag laga av det här?', image, at: now() });
   S.busy = true; saveChat(); renderChat(true);
-  const showStageLoader = S.route.view === 'home';
-  if (showStageLoader) renderStage();
+  if (S.route.view === 'home' || S.route.view === 'suggestions') renderStage();
   try {
-    const raw = await callModel();
+    const raw = await callModel(showProgress);
     const o = parseReply(raw);
     const msg = { role: 'assistant', text: o.reply || '', at: now() };
     const recipe = normalizeRecipe(o.recipe);
@@ -348,7 +382,7 @@ async function send(text, image) {
     openChat(true);
   } finally {
     S.busy = false; saveChat(); renderChat(true);
-    if (S.route.view === 'home') renderStage();
+    if (S.route.view === 'home' || S.route.view === 'suggestions') renderStage();
     if (!document.querySelector('.app[data-chat="open"]')) $('#chatDot').hidden = false;
   }
 }
@@ -423,7 +457,7 @@ function renderChat(scroll) {
       return `<div class="msg assistant">${md(m.text) || ''}${extra}</div>`;
     }).join('');
   }
-  if (S.busy) log.insertAdjacentHTML('beforeend', `<div class="msg assistant typing" aria-label="Kocken skriver"><i></i><i></i><i></i></div>`);
+  if (S.busy) log.insertAdjacentHTML('beforeend', `<div class="msg assistant typing" id="liveReply" aria-label="Kocken skriver"><i></i><i></i><i></i></div>`);
   $('#chatInput').disabled = false;
   $('#composer .send').disabled = S.busy;
   if (scroll) log.scrollTop = log.scrollHeight;
@@ -460,7 +494,7 @@ function viewHome() {
     : `Det är <strong>${d.name}</strong> – vardag. Kocken håller det snabbt, med lite disk.`;
   const recent = S.data.recipes.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 4);
   if (S.busy) {
-    return `<section class="home"><div class="loading-stage">${potSvg()}<span>Kocken tänker…</span></div></section>`;
+    return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Kocken tänker…</span></div></section>`;
   }
   return `<section class="home">
     <h1>Vad har ni, och vad är ni sugna på?</h1>
@@ -497,6 +531,7 @@ function potSvg() {
 }
 
 function viewSuggestions() {
+  if (S.busy) return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Kocken tänker…</span></div></section>`;
   const list = S.current.suggestions || [];
   if (!list.length) return `<div class="empty"><h2>Inga förslag än</h2><p>Berätta vad ni har så föreslår kocken rätter.</p><button class="btn" data-go="home">Till kocken</button></div>`;
   return `<section>
