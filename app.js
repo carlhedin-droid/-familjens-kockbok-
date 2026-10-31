@@ -108,6 +108,28 @@ const DEFAULT_PREFS = {
   customEquipment: [],
 };
 
+const S_STR = { type: 'STRING' }, S_STRN = { type: 'STRING', nullable: true }, S_ARR = { type: 'ARRAY', items: S_STR };
+const RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    reply: S_STR,
+    suggestions: { type: 'ARRAY', nullable: true, items: { type: 'OBJECT', properties: {
+      name: S_STR, origin: S_STR, countries: S_ARR, tag: { type: 'STRING', enum: ['VARDAG', 'HELG'] }, time: S_STR, difficulty: S_STR,
+      why: S_STR, keyIngredients: S_ARR, equipment: S_STRN, healthier: { type: 'BOOLEAN' }, vegetarian: { type: 'BOOLEAN' } },
+      required: ['name', 'origin', 'tag', 'time', 'why'] } },
+    recipe: { type: 'OBJECT', nullable: true, properties: {
+      title: S_STR, origin: S_STR, countries: S_ARR, tag: { type: 'STRING', enum: ['VARDAG', 'HELG'] }, time: S_STR, servings: { type: 'INTEGER' }, intro: S_STR,
+      ingredients: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: S_STR, amount: S_STR, name: S_STR, note: S_STRN, group: S_STRN }, required: ['id', 'amount', 'name'] } },
+      steps: { type: 'ARRAY', items: { type: 'OBJECT', properties: { text: S_STR, uses: S_ARR, minutes: { type: 'INTEGER', nullable: true } }, required: ['text'] } },
+      health: { type: 'OBJECT', nullable: true, properties: { summary: S_STR, tips: S_ARR } },
+      tips: S_ARR },
+      required: ['title', 'ingredients', 'steps'] },
+    learn: S_ARR,
+  },
+  required: ['reply'],
+  propertyOrdering: ['reply', 'suggestions', 'recipe', 'learn'],
+};
+
 const FORMAT_RULES = `## APPENS SVARSFORMAT (måste följas)
 Du svarar inuti en app. Svara ALLTID med exakt ett JSON-objekt – ingen text före eller efter, inga kodstaket.
 {
@@ -303,12 +325,12 @@ function stripRecipe(r) {
 /* ============ AI-anrop ============ */
 function historyForModel() {
   return S.chat.filter(m => m.role === 'user' || m.role === 'assistant').slice(-16).map(m => {
-    let text = m.text || '';
-    if (m.role === 'assistant') {
-      if (m.view?.recipe) text += `\n[Visade receptet "${m.view.recipe.title}" på skärmen]`;
-      if (m.view?.suggestions) text += `\n[Visade förslag: ${m.view.suggestions.map(s => s.name).join(', ')}]`;
-    }
-    return { role: m.role, text: text || '(tomt)', image: m.image };
+    if (m.role === 'user') return { role: 'user', text: m.text || '(foto)', image: m.image };
+    // Assistentens tidigare svar i samma JSON-form som den ska svara i (receptet självt ligger i systemprompten)
+    const o = { reply: m.placeholder ? '' : (m.text || '') };
+    if (m.view?.recipe) o.recipe = `(receptet "${m.view.recipe.title}" visades)`;
+    if (m.view?.suggestions) o.suggestions = m.view.suggestions.map(x => x.name);
+    return { role: 'assistant', text: JSON.stringify(o) };
   });
 }
 async function callModel(onProgress = () => {}) {
@@ -335,12 +357,13 @@ async function callModel(onProgress = () => {}) {
   if (!key) throw new Error('NOKEY');
   const lastUser = [...msgs].reverse().find(m => m.role === 'user');
   const hasLink = /https?:\/\/\S+/.test(lastUser?.text || '');
+  let schema = RESPONSE_SCHEMA;
   const mkBody = thinking => JSON.stringify({
     ...(hasLink ? { tools: [{ url_context: {} }] } : {}),
     systemInstruction: { parts: [{ text: sys }] },
     contents: mergeRoles(msgs).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [
       ...(m.image ? [{ inlineData: { mimeType: m.image.mime, data: m.image.data } }] : []), { text: m.text } ] })),
-    generationConfig: { ...(hasLink ? {} : { responseMimeType: 'application/json' }), temperature: 0.8, ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}) },
+    generationConfig: { ...(hasLink ? {} : { responseMimeType: 'application/json', responseSchema: schema }), temperature: 0.8, ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}) },
   });
   // Prova vald modell först, sedan reservmodeller om den inte finns/inte ingår i gratisnivån
   const models = [...new Set([S.settings.geminiModel || DEFAULT_MODELS.gemini, ...GEMINI_FALLBACKS])];
@@ -383,6 +406,7 @@ async function callModel(onProgress = () => {}) {
       const status = j.error?.status || '';
       console.warn('Gemini', model, res.status, status, msg);
       if (res.status === 400 && thinking && /think/i.test(msg)) { thinking = null; continue; }  // modellen godtar inte nivån
+      if (res.status === 400 && schema && /schema|response_schema|responseSchema/i.test(msg)) { schema = undefined; continue; }
       lastErr = `${model}: ${msg}`;
       // Överbelastad (503/500) eller kvot slut (429): prova nästa modell direkt
       if (res.status === 503 || res.status === 500 || res.status === 429 || /UNAVAILABLE|high demand|overloaded|RESOURCE_EXHAUSTED/i.test(msg + status)) {
@@ -411,15 +435,26 @@ function mergeRoles(msgs) {
   return out;
 }
 function parseReply(raw) {
-  let t = String(raw).trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  const t = String(raw ?? '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  let o = null;
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
-  if (a >= 0 && b > a) {
-    try {
-      const o = JSON.parse(t.slice(a, b + 1));
-      if (o && typeof o === 'object') return o;
-    } catch { /* faller igenom */ }
+  if (a >= 0 && b > a) { try { o = JSON.parse(t.slice(a, b + 1)); } catch { o = null; } }
+  if (Array.isArray(o)) o = o.find(x => x && typeof x === 'object') || null;
+  if (!o || typeof o !== 'object') {
+    // Inte giltig JSON: plocka ut "reply" om det finns, annars visa texten utan JSON-skräp
+    const r = partialReply(t);
+    o = { reply: r || (a >= 0 ? '' : t) };
   }
-  return { reply: raw, suggestions: null, recipe: null, learn: [] };
+  return { reply: cleanReply(o.reply), suggestions: o.suggestions ?? null, recipe: o.recipe ?? null, learn: Array.isArray(o.learn) ? o.learn : [] };
+}
+function cleanReply(r) {
+  if (r == null) return '';
+  if (typeof r === 'object') r = r.text || r.reply || '';
+  r = String(r).trim();
+  if (/^(null|undefined|none|n\/a|\{\}|\[\])$/i.test(r)) return '';
+  // Ta bort ev. inbakade JSON-rester och våra gamla interna noteringar
+  r = r.replace(/\n?\[(Visade receptet|Visade förslag)[^\]]*\]/g, '').replace(/^"|"$/g, '').trim();
+  return r;
 }
 function normalizeRecipe(r) {
   if (!r || !Array.isArray(r.ingredients) || !Array.isArray(r.steps)) return null;
@@ -473,7 +508,8 @@ async function send(text, image, opts = {}) {
       msg.hidden = true; userMsg.hidden = true;
       go('suggestions', { keepChat: true });
     }
-    const learned = (Array.isArray(o.learn) ? o.learn : []).map(s => String(s).trim()).filter(Boolean);
+    const learned = (Array.isArray(o.learn) ? o.learn : []).map(s => cleanReply(s)).filter(x => x.length > 3);
+    if (!recipe && !sugg && !msg.text) { msg.text = 'Kocken gav inget svar på det. Försök formulera om frågan.'; msg.placeholder = true; }
     if (learned.length) {
       const existing = new Set(S.data.memory.filter(m => !m.deleted).map(m => m.text.toLowerCase()));
       const fresh = learned.filter(l => !existing.has(l.toLowerCase()));
