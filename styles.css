@@ -172,12 +172,13 @@ h1, h2, h3 { font-family: var(--font-display); line-height: 1.12; margin: 0; let
 .chip:hover { border-color: var(--pandan); }
 .muted { color: var(--muted); }
 .tag {
-  display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 999px;
+  display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 999px; white-space: nowrap; line-height: 1.5;
   background: var(--surface-2); color: var(--ink);
 }
 .tag.vardag { background: var(--pandan-soft); }
 .tag.helg { background: var(--kunyit-soft); }
-.tag.health { background: transparent; border: 1.5px solid var(--pandan); color: var(--pandan); }
+.tag.healthy { background: var(--pandan); color: var(--pandan-ink); }
+.tag.healthy::before { content: "♥ "; }
 .tag.veg { background: transparent; border: 1.5px solid var(--muted); color: var(--muted); }
 .empty { text-align: center; padding: 48px 16px; color: var(--muted); }
 .empty h2 { color: var(--ink); margin-bottom: 8px; font-size: 24px; }
@@ -209,7 +210,7 @@ h1, h2, h3 { font-family: var(--font-display); line-height: 1.12; margin: 0; let
   padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 8px;
 }
 .sugg.healthier { border: 2px solid var(--pandan); }
-.sugg .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.sugg .tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .sugg h3 { font-size: 22px; }
 .sugg .origin { color: var(--muted); font-size: 15px; margin-top: -4px; }
 .sugg .why { margin: 4px 0; }
@@ -443,3 +444,9 @@ details.adv[open] summary { margin-bottom: 8px; }
 .status-pop .seg button { flex: 1; padding: 7px 8px; }
 @media (max-width: 1100px) { .status-btn .long { display: none; } .status-btn .short { display: inline; } }
 @media (max-width: 760px) { .status-pop { right: 16px; top: 56px; } .status-btn { padding: 6px 8px 6px 10px; font-size: 13.5px; min-height: 36px; } .brand svg { width: 24px; height: 24px; } .nav-btn { padding: 8px 8px; } .nav { gap: 0; } }
+
+/* ---------- Flaggor ---------- */
+.origin { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.flag { width: 22px; height: 16px; object-fit: cover; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,.12); vertical-align: -2px; }
+.sugg .origin { font-size: 15px; }
+.book-row h3 .origin { margin-right: 8px; vertical-align: 1px; }

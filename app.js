@@ -112,9 +112,9 @@ const FORMAT_RULES = `## APPENS SVARSFORMAT (måste följas)
 Du svarar inuti en app. Svara ALLTID med exakt ett JSON-objekt – ingen text före eller efter, inga kodstaket.
 {
   "reply": "Text som visas i chatten. Vid snabba frågor (LÄGE 1) är detta hela svaret. När du ger förslag eller recept: högst 1–2 meningar – upprepa INTE förslagen eller receptet här. Enkel markdown (**fet**, punktlistor med '- ') är ok.",
-  "suggestions": null | [ { "name": "", "origin": "kök/land", "tag": "VARDAG" | "HELG", "time": "t.ex. 35 min", "difficulty": "Lätt" | "Medel" | "Avancerad", "why": "1–2 meningar om varför den passar oss", "keyIngredients": [""], "equipment": "" | null, "healthier": true|false, "vegetarian": true|false } ],
+  "suggestions": null | [ { "name": "", "origin": "kök/land", "countries": ["MY"], "tag": "VARDAG" | "HELG", "time": "t.ex. 35 min", "difficulty": "Lätt" | "Medel" | "Avancerad", "why": "1–2 meningar om varför den passar oss", "keyIngredients": [""], "equipment": "" | null, "healthier": true|false, "vegetarian": true|false } ],
   "recipe": null | {
-    "title": "", "origin": "", "tag": "VARDAG" | "HELG", "time": "", "servings": 4, "intro": "1–2 meningar",
+    "title": "", "origin": "", "countries": ["MY"], "tag": "VARDAG" | "HELG", "time": "", "servings": 4, "intro": "1–2 meningar",
     "ingredients": [ { "id": "i1", "amount": "300 g", "name": "kycklinglårfilé", "note": "i bitar" | null, "group": "Marinad" | null } ],
     "steps": [ { "text": "Bryn 300 g kycklinglårfilé ...", "uses": ["i1"], "minutes": 8 | null } ],
     "health": { "summary": "Pappas val: ...", "tips": [""] },
@@ -125,6 +125,7 @@ Du svarar inuti en app. Svara ALLTID med exakt ett JSON-objekt – ingen text f�
 Regler:
 - LÄGE 3 (inspiration) → fyll "suggestions". LÄGE 2 (komplett recept, eller när jag ber dig ändra receptet som visas) → fyll "recipe" med HELA receptet. LÄGE 1 → båda null.
 - I varje steg: skriv ut mängderna i texten och lista ingrediensernas id i "uses". "minutes" anges för steg med vänte-/tillagningstid.
+- "countries": ISO 3166-1 alfa-2-koder (versaler) för rättens ursprungsland, t.ex. ["MY"], ["FR","SE"] för fusion. Regionalt kök → huvudlandet (Sydamerikanskt ceviche → ["PE"]).
 - "group" används för att dela upp ingredienser (t.ex. "Marinad", "Sås", "Servering"); annars null.
 - "learn": bara NYA saker vi själva sagt eller tydligt visat (t.ex. "Barnen tycker inte om koriander", "Vi gillade mer chili i panangen"). Inga gissningar. Annars [].
 - Använd smakminnet och kockboken nedan för att träffa vår smak. Föreslå gärna variationer på rätter vi gett högt betyg.
@@ -644,11 +645,11 @@ function viewSuggestions() {
       <article class="sugg ${s.healthier ? 'healthier' : ''}">
         <div class="tags">
           <span class="tag ${String(s.tag).toLowerCase() === 'helg' ? 'helg' : 'vardag'}">${String(s.tag).toLowerCase() === 'helg' ? 'Helg' : 'Vardag'}</span>
-          ${s.healthier ? '<span class="tag health">Pappas val – nyttigare</span>' : ''}
+          ${s.healthier ? `<span class="tag healthy">${esc(healthLabel())}</span>` : ''}
           ${s.vegetarian ? '<span class="tag veg">Vegetarisk</span>' : ''}
         </div>
         <h3>${esc(s.name)}</h3>
-        ${s.origin ? `<div class="origin">${esc(s.origin)}</div>` : ''}
+        ${s.origin || s.countries ? `<div class="origin">${flags(s)}<span>${esc(s.origin || '')}</span></div>` : ''}
         ${s.why ? `<p class="why">${esc(s.why)}</p>` : ''}
         <dl>
           ${s.time || s.difficulty ? `<dt>Tid</dt><dd>${esc([s.time, s.difficulty].filter(Boolean).join(', '))}</dd>` : ''}
@@ -681,7 +682,7 @@ function viewRecipe() {
       <h1>${esc(r.title)}</h1>
       <div class="r-meta">
         ${r.tag ? `<span class="tag ${isHelg ? 'helg' : 'vardag'}">${isHelg ? 'Helg' : 'Vardag'}</span>` : ''}
-        ${r.origin ? `<span>${esc(r.origin)}</span>` : ''}
+        ${r.origin || r.countries ? `<span class="origin">${flags(r)}<span>${esc(r.origin || '')}</span></span>` : ''}
         ${r.time ? `<span>${esc(r.time)}</span>` : ''}
         <span>${esc(r.servings)} portioner</span>
         ${saved?.rating ? `<span class="rt" style="color:var(--kunyit)">${'★'.repeat(saved.rating)}</span>` : ''}
@@ -706,7 +707,7 @@ function viewRecipe() {
             <span class="amt">${esc(i.amount)}</span>
             <span><span class="name">${esc(i.name)}</span>${i.note ? ` <span class="note">${esc(i.note)}</span>` : ''}</span>
           </label>`).join('')}`).join('')}
-        ${r.health ? `<div class="health"><h3>Pappas val</h3>${r.health.summary ? `<div>${md(r.health.summary)}</div>` : ''}
+        ${r.health ? `<div class="health"><h3>${esc(healthLabel())}</h3>${r.health.summary ? `<div>${md(r.health.summary)}</div>` : ''}
           ${r.health.tips?.length ? `<ul>${r.health.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>` : ''}
         ${r.tips?.length ? `<div class="tips"><h3>Kockens tips</h3><ul>${r.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
       </div>
@@ -739,9 +740,30 @@ function notesBox(saved) {
   </div>`;
 }
 
+const FLAG_WORDS = [
+  [/svensk|sverige|nordisk|skandinav/i, 'SE'], [/fransk|frankrike|provens/i, 'FR'], [/italien/i, 'IT'], [/spansk|spanien|katalan/i, 'ES'],
+  [/grek/i, 'GR'], [/liban|levant/i, 'LB'], [/turk/i, 'TR'], [/indisk|indien/i, 'IN'], [/thai/i, 'TH'], [/malays|nyonya|peranakan/i, 'MY'],
+  [/singapor/i, 'SG'], [/vietnam/i, 'VN'], [/kines|kina|sichuan|kanton/i, 'CN'], [/korea/i, 'KR'], [/japan/i, 'JP'],
+  [/amerikan|usa|texas|cajun|southern/i, 'US'], [/mexik|tex-mex/i, 'MX'], [/peru/i, 'PE'], [/argentin/i, 'AR'], [/brasil/i, 'BR'],
+  [/marock|nordafrik/i, 'MA'], [/britt|engelsk|england/i, 'GB'], [/tysk/i, 'DE'], [/indones/i, 'ID'], [/filippin/i, 'PH'],
+  [/jamaica|karib/i, 'JM'], [/etiop/i, 'ET'], [/portug/i, 'PT'], [/ungern|ungersk/i, 'HU'], [/polsk|polen/i, 'PL'], [/israel/i, 'IL'], [/persisk|iran/i, 'IR'],
+];
+function countryCodes(x) {
+  let c = Array.isArray(x.countries) ? x.countries.map(v => String(v).trim().toUpperCase()).filter(v => /^[A-Z]{2}$/.test(v)) : [];
+  if (!c.length && x.origin) c = FLAG_WORDS.filter(([re]) => re.test(x.origin)).map(([, cc]) => cc);
+  return [...new Set(c)].slice(0, 3);
+}
+function flags(x) {
+  // Bilder i stället för emoji – Windows visar inte flagg-emoji
+  return countryCodes(x).map(cc => `<img class="flag" src="https://flagcdn.com/w40/${cc.toLowerCase()}.png" alt="${cc}" title="${cc}" width="22" height="16" loading="lazy">`).join('');
+}
+function healthLabel() {
+  const who = (S.data.prefs.healthWho || '').trim();
+  return who ? `${who}s val` : 'Nyttigare';
+}
 function bookRow(r) {
   return `<button class="book-row" data-open="${esc(r.id)}">
-    <h3>${esc(r.title)}</h3>
+    <h3><span class="origin">${flags(r)}</span>${esc(r.title)}</h3>
     <span class="rt" aria-label="${r.rating ? r.rating + ' av 5' : 'Inget betyg'}">${r.rating ? '★'.repeat(r.rating) : ''}</span>
     <span class="sub">${esc([r.origin, r.time, r.cooked?.length ? `lagad ${r.cooked.length} ggr` : 'inte lagad än'].filter(Boolean).join(', '))}</span>
     ${r.notes ? `<span class="note-snip">${esc(r.notes.slice(0, 140))}${r.notes.length > 140 ? '…' : ''}</span>` : ''}
