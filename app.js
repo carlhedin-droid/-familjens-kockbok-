@@ -130,8 +130,8 @@ Regler:
 - Använd smakminnet och kockboken nedan för att träffa vår smak. Föreslå gärna variationer på rätter vi gett högt betyg.
 - Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.`;
 
-const DEFAULT_MODELS = { gemini: 'gemini-3.8-flash', claude: 'claude-sonnet-5-5' };
-const GEMINI_FALLBACKS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+const DEFAULT_MODELS = { gemini: 'gemini-3.6-flash', claude: 'claude-sonnet-5-5' };
+const GEMINI_FALLBACKS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
 const DATA_FILE = 'familjens-kockbok.json';
 
 /* ============ Lagring ============ */
@@ -167,6 +167,8 @@ if (!S.settings.migratedGemini) {
   if (S.settings.geminiModel === 'gemini-flash-latest') S.settings.geminiModel = DEFAULT_MODELS.gemini;
   S.settings.migratedGemini = true; saveSettings();
 }
+// 3.8 är ofta överbelastad på gratisnivån – byt till 3.6 som standard
+if (!S.settings.migrated36) { if (!S.settings.geminiModel || /3\.8|flash-latest/.test(S.settings.geminiModel)) S.settings.geminiModel = DEFAULT_MODELS.gemini; S.settings.migrated36 = true; saveSettings(); }
 // Inställningar flyttade från prompten till klickbara val
 S.data.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), S.data.prefs || {});
 if (S.data.instructions === LEGACY_INSTRUCTIONS) S.data.instructions = DEFAULT_INSTRUCTIONS;
@@ -344,8 +346,8 @@ async function callModel(onProgress = () => {}) {
   let lastErr = '';
   for (const model of models) {
     // Minsta tänkande = snabbast. 3.8 klarar "low", övriga "minimal".
-    let thinking = /3\.8/.test(model) ? 'low' : 'minimal';
-    for (let attempt = 0; attempt < 2; attempt++) {
+    let thinking = /3\.8|latest/.test(model) ? 'low' : 'minimal';
+    for (let attempt = 0; attempt < 3; attempt++) {
       let res;
       try {
         res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
@@ -382,7 +384,12 @@ async function callModel(onProgress = () => {}) {
       if (res.status === 400 && thinking && /think/i.test(msg)) { thinking = null; continue; }  // modellen godtar inte nivån
       lastErr = `${model}: ${msg}`;
       // Överbelastad (503/500) eller kvot slut (429): prova nästa modell direkt
-      if (res.status === 503 || res.status === 500 || res.status === 429 || /UNAVAILABLE|high demand|overloaded|RESOURCE_EXHAUSTED/i.test(msg + status)) { lastErr = res.status === 429 ? `${model}: dagens gratiskvot är slut` : `${model}: överbelastad just nu`; break; }
+      if (res.status === 503 || res.status === 500 || res.status === 429 || /UNAVAILABLE|high demand|overloaded|RESOURCE_EXHAUSTED/i.test(msg + status)) {
+        lastErr = res.status === 429 ? `${model}: gratiskvoten är slut för stunden` : `${model}: överbelastad just nu`;
+        onProgress('', 'Google har mycket att göra – provar igen…');
+        if (attempt === 0 && res.status !== 429) { await new Promise(r => setTimeout(r, 1500)); continue; }
+        break;
+      }
       if (res.status === 404 || /not found|not supported|no longer available|ACCESS_TOKEN_TYPE_UNSUPPORTED/i.test(msg + status)) break;
       if (res.status === 400 && /API key not valid|API_KEY_INVALID/i.test(msg + JSON.stringify(j))) throw new Error('Google säger att nyckeln är ogiltig. Kopiera den igen från aistudio.google.com/apikey och spara på nytt.');
       if (res.status === 403) throw new Error('Nyckeln saknar behörighet (403): ' + msg + ' – skapa en ny nyckel i AI Studio.');
@@ -428,8 +435,8 @@ function partialReply(acc) {
   if (!m) return '';
   try { return JSON.parse('"' + m[1].replace(/\\$/, '') + '"'); } catch { return m[1].replace(/\\n/g, '\n'); }
 }
-function showProgress(acc) {
-  const what = /"recipe"\s*:\s*\{/.test(acc) ? 'Kocken skriver receptet…'
+function showProgress(acc, override) {
+  const what = override ? override : /"recipe"\s*:\s*\{/.test(acc) ? 'Kocken skriver receptet…'
     : /"suggestions"\s*:\s*\[/.test(acc) ? `Kocken plockar fram förslag… (${(acc.match(/"name"\s*:/g) || []).length} hittills)`
     : 'Kocken tänker…';
   const st = document.getElementById('stageStatus'); if (st) st.textContent = what;
