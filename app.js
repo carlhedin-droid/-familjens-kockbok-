@@ -283,8 +283,47 @@ function dayInfo(d = new Date()) {
 }
 function highlightAmounts(text) {
   // fetmarkera mängder som "300 g", "2 msk", "1,5 dl", "3 st"
-  return esc(text).replace(/(\d+(?:[.,]\d+)?(?:\s?[–-]\s?\d+(?:[.,]\d+)?)?\s?(?:kg|g|hg|mg|l|dl|cl|ml|msk|tsk|krm|st|klyftor?|nypa|cm|°C|grader)\b)/gi, '<b>$1</b>');
+  const n = '(?:\\d+\\s\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:[.,]\\d+)?)';
+  return esc(text).replace(new RegExp('(' + n + '(?:\\s?[–-]\\s?' + n + ')?\\s?(?:kg|g|hg|mg|l|dl|cl|ml|msk|tsk|krm|st|klyftor?|förp|nypa|cm|°C|grader)(?![a-zåäö]))', 'gi'), '<b>$1</b>');
 }
+const UNIT_RE = '(?:kg|g|hg|mg|l|dl|cl|ml|msk|tsk|krm|st|klyftor?|förp|burk|burkar|paket|knippe|skivor|nypa)';
+function parseNum(t) {
+  t = t.trim().replace(',', '.');
+  let m;
+  if ((m = t.match(/^(\d+)\s+(\d+)\/(\d+)$/))) return +m[1] + m[2] / m[3];
+  if ((m = t.match(/^(\d+)\/(\d+)$/))) return m[1] / m[2];
+  return parseFloat(t);
+}
+function fmtNum(x, unit = '') {
+  if (!isFinite(x)) return '';
+  if (/^(g|ml)$/i.test(unit) && x >= 50) return String(Math.round(x / 5) * 5);
+  if (x >= 10) return String(Math.round(x));
+  const fr = [[0.25, '1/4'], [0.33, '1/3'], [0.5, '1/2'], [0.67, '2/3'], [0.75, '3/4']];
+  const whole = Math.floor(x), rest = x - whole;
+  if (/^(st|förp|burk|burkar|paket|knippe|klyfta|klyftor)$/i.test(unit) || !unit) {
+    const f = fr.find(([v]) => Math.abs(rest - v) < 0.05);
+    if (f) return (whole ? whole + ' ' : '') + f[1];
+    if (rest < 0.05) return String(whole);
+    if (rest > 0.95) return String(whole + 1);
+  }
+  return String(Math.round(x * 10) / 10).replace('.', ',');
+}
+const NUM = '(\\d+\\s\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:[.,]\\d+)?)';
+function scaleAmount(amount, f) {
+  if (f === 1 || !amount) return amount;
+  // bara första talet (inte "(à 340 g)")
+  return String(amount).replace(new RegExp('^\\s*' + NUM + '(\\s?[–-]\\s?' + NUM + ')?(\\s*)(\\S*)'), (m, a, rng, b, sp, unit) =>
+    fmtNum(parseNum(a) * f, unit) + (rng ? '–' + fmtNum(parseNum(b) * f, unit) : '') + sp + unit);
+}
+function scaleStepText(text, f) {
+  if (f === 1) return text;
+  return String(text).replace(new RegExp(NUM + '(\\s?[–-]\\s?' + NUM + ')?(\\s?)(' + UNIT_RE + ')\\b', 'gi'), (m, a, rng, b, sp, unit) =>
+    fmtNum(parseNum(a) * f, unit) + (rng ? '–' + fmtNum(parseNum(b) * f, unit) : '') + sp + unit);
+}
+function portionsFor(r) {
+  return S.portions && S.portions.title === r.title ? S.portions.n : (r.servings || 4);
+}
+
 async function fileToImage(file) {
   const url = URL.createObjectURL(file);
   const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
@@ -310,7 +349,7 @@ function buildSystem() {
       return `- ${r.title}${r.origin ? ` (${r.origin})` : ''}${bits.length ? ` – ${bits.join(', ')}` : ''}${note ? `. Anteckning: ${note}` : ''}`;
     }).join('\n') || '- (kockboken är tom än så länge)';
   const onScreen = S.route.view === 'recipe' && S.current.recipe
-    ? JSON.stringify(stripRecipe(S.current.recipe))
+    ? JSON.stringify(stripRecipe(S.current.recipe)) + (portionsFor(S.current.recipe) !== (S.current.recipe.servings || 4) ? `\n(Vi har skalat receptet till ${portionsFor(S.current.recipe)} portioner i appen. Svara utifrån det. Ber vi om ändringar: skicka receptet för ${portionsFor(S.current.recipe)} portioner.)` : '')
     : (S.route.view === 'suggestions' && S.current.suggestions
       ? 'Förslagslistan: ' + S.current.suggestions.map((s, i) => `${i + 1}. ${s.name}`).join('; ')
       : 'Inget recept visas just nu.');
@@ -531,6 +570,7 @@ async function send(text, image, opts = {}) {
       const keepId = S.route.view === 'recipe' ? S.current.recipeSavedId : null;
       S.current.recipe = recipe; S.current.recipeSavedId = keepId; S.current.dirty = !!keepId;
       S.checked = {}; S.doneSteps = {}; S.activeStep = null;
+      if (!(S.portions && S.portions.title === recipe.title)) S.portions = null;
       msg.view = { recipe };
       if (flow) msg.hidden = true; else msg.updated = true;
       if (S.route.view !== 'recipe') go('recipe', { keepChat: true }); else { const sc = $('#stage').scrollTop; renderStage(); $('#stage').scrollTop = sc; }
@@ -647,9 +687,20 @@ $('#chatLog').addEventListener('click', e => {
 });
 
 /* ============ Vyer ============ */
+// Liggande läge (mobil/platta/dator): ingredienser och steg sida vid sida, som ICA:s laga-läge
+const landscapeMQ = matchMedia('(orientation: landscape)');
+function updateSplit() {
+  const st = $('#stage');
+  const on = st.classList.contains('recipe-view') && landscapeMQ.matches && st.clientWidth >= 600;
+  if (st.classList.contains('split') !== on) st.classList.toggle('split', on);
+}
+new ResizeObserver(() => updateSplit()).observe(document.getElementById('stage'));
+landscapeMQ.addEventListener?.('change', updateSplit);
 function renderStage() {
   const st = $('#stage');
   const v = S.route.view;
+  st.classList.toggle('recipe-view', v === 'recipe' && !!S.current.recipe);
+  updateSplit();
   if (v === 'home') st.innerHTML = viewHome();
   else if (v === 'suggestions') st.innerHTML = viewSuggestions();
   else if (v === 'recipe') st.innerHTML = viewRecipe();
@@ -735,6 +786,7 @@ function viewRecipe() {
   const r = S.current.recipe;
   if (!r) return `<div class="empty"><h2>Inget recept öppet</h2><p>Välj ett förslag eller öppna en rätt i kockboken.</p><button class="btn" data-go="home">Till kocken</button></div>`;
   const saved = S.current.recipeSavedId ? S.data.recipes.find(x => x.id === S.current.recipeSavedId) : null;
+  const n = portionsFor(r), f = n / (r.servings || 4);
   const groups = [];
   r.ingredients.forEach(ing => {
     let g = groups.find(x => x.name === (ing.group || ''));
@@ -742,26 +794,26 @@ function viewRecipe() {
     g.items.push(ing);
   });
   const checkedCount = r.ingredients.filter(i => S.checked[i.id]).length;
-  const doneCount = r.steps.filter((_, n) => S.doneSteps[n]).length;
+  const doneCount = r.steps.filter((_, k) => S.doneSteps[k]).length;
   const isHelg = String(r.tag).toLowerCase() === 'helg';
+  const back = S.current.recipeSavedId ? 'book' : S.current.suggestions ? 'suggestions' : 'home';
+  const stepper = `<div class="stepper portions" role="group" aria-label="Portioner"><button type="button" data-rport="-1" aria-label="Färre portioner">−</button><output>${n} portioner</output><button type="button" data-rport="1" aria-label="Fler portioner">+</button></div>`;
   return `<article class="recipe">
   <header class="r-head">
+    <button class="icon-btn r-close" data-go="${back}" aria-label="Stäng receptet" title="Stäng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
     ${r.origin || r.countries ? `<div class="r-origin origin">${flags(r)}<span>${esc(r.origin || '')}</span></div>` : ''}
     <h1>${esc(r.title)}</h1>
     <div class="r-meta">
       ${r.tag ? `<span class="tag ${isHelg ? 'helg' : 'vardag'}">${isHelg ? 'Helg' : 'Vardag'}</span>` : ''}
       ${r.time ? `<span>${esc(r.time)}</span>` : ''}
-      <span>${esc(r.servings)} portioner</span>
       ${saved?.rating ? `<span style="color:var(--kunyit)">${'★'.repeat(saved.rating)}</span>` : ''}
+      <span class="r-actions">
+        ${!saved ? `<button class="btn small" data-save>Spara i kockboken</button>`
+          : S.current.dirty ? `<button class="btn small" data-save>Spara ändringarna</button>`
+          : `<button class="ghost small" data-cooked>Vi lagade den idag</button>`}
+      </span>
     </div>
     ${r.intro ? `<p class="r-intro">${esc(r.intro)}</p>` : ''}
-    <div class="r-actions">
-      ${!saved ? `<button class="btn" data-save>Spara i kockboken</button>`
-        : S.current.dirty ? `<button class="btn" data-save>Spara ändringarna</button>`
-        : `<button class="ghost" data-cooked>Vi lagade den idag</button>`}
-      ${S.current.suggestions && !saved ? `<button class="ghost" data-go="suggestions">Tillbaka till förslagen</button>` : ''}
-      ${saved ? `<button class="ghost" data-go="book">Kockboken</button>` : ''}
-    </div>
   </header>
 
   <nav class="r-jump" aria-label="Hoppa till">
@@ -769,35 +821,36 @@ function viewRecipe() {
     <button data-jump="r-steps">Gör så här <span>${doneCount}/${r.steps.length}</span></button>
   </nav>
 
+  <div class="r-split">
   <section class="r-sec ingredients" id="r-ing" aria-label="Ingredienser">
-    <div class="sec-head"><h2>Ingredienser</h2><span class="muted">${esc(r.servings)} portioner · bocka av det du tagit fram</span></div>
+    <div class="sec-head"><h2>Ingredienser</h2>${stepper}</div>
     ${groups.map(g => `<div class="ing-group">${g.name ? `<h3 class="group-label">${esc(g.name)}</h3>` : ''}
       ${g.items.map(i => `<label class="ing ${S.checked[i.id] ? 'checked' : ''}" data-ing="${esc(i.id)}">
         <input type="checkbox" ${S.checked[i.id] ? 'checked' : ''} data-check="${esc(i.id)}">
-        <span class="amt">${esc(i.amount)}</span>
+        <span class="amt">${esc(scaleAmount(i.amount, f))}</span>
         <span><span class="name">${esc(i.name)}</span>${i.note ? ` <span class="note">${esc(i.note)}</span>` : ''}</span>
       </label>`).join('')}</div>`).join('')}
     <button class="btn start-cook" data-startcook>Allt är framme – börja laga</button>
   </section>
 
   <section class="r-sec steps" id="r-steps" aria-label="Gör så här">
-    <div class="sec-head"><h2>Gör så här</h2><span class="muted">Tryck på ett steg för att markera var du är</span></div>
-    <ol>${r.steps.map((s, n) => `
-      <li class="step ${S.activeStep === n ? 'active' : ''} ${S.doneSteps[n] ? 'done' : ''}" data-step="${n}">
-        <div class="step-text">${highlightAmounts(s.text)}</div>
+    <div class="sec-head"><h2>Gör så här</h2><span class="muted step-hint">Tryck på ett steg för att markera var du är</span>${stepper}</div>
+    <ol>${r.steps.map((s, k) => `
+      <li class="step ${S.activeStep === k ? 'active' : ''} ${S.doneSteps[k] ? 'done' : ''}" data-step="${k}">
+        <div class="step-text">${highlightAmounts(scaleStepText(s.text, f))}</div>
         <div class="step-tools">
-          ${s.minutes ? `<button class="ghost" data-timer="${n}">⏱ ${fmtMin(s.minutes)}</button>` : ''}
-          <button class="ghost" data-done="${n}">${S.doneSteps[n] ? 'Ångra' : 'Klar'}</button>
+          ${s.minutes ? `<button class="ghost" data-timer="${k}">⏱ ${fmtMin(s.minutes)}</button>` : ''}
+          <button class="ghost" data-done="${k}">${S.doneSteps[k] ? 'Ångra' : 'Klar'}</button>
         </div>
       </li>`).join('')}</ol>
+    ${r.health || r.tips?.length ? `<div class="extras">
+      ${r.health ? `<div class="health"><h3>${esc(healthLabel())}</h3>${r.health.summary ? `<div>${md(r.health.summary)}</div>` : ''}
+        ${r.health.tips?.length ? `<ul>${r.health.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>` : ''}
+      ${r.tips?.length ? `<div class="tips"><h3>Kockens tips</h3><ul>${r.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
+    </div>` : ''}
+    ${saved ? `<div class="notes-wrap">${notesBox(saved)}</div>` : ''}
   </section>
-
-  ${r.health || r.tips?.length ? `<section class="r-sec extras">
-    ${r.health ? `<div class="health"><h3>${esc(healthLabel())}</h3>${r.health.summary ? `<div>${md(r.health.summary)}</div>` : ''}
-      ${r.health.tips?.length ? `<ul>${r.health.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>` : ''}
-    ${r.tips?.length ? `<div class="tips"><h3>Kockens tips</h3><ul>${r.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
-  </section>` : ''}
-  ${saved ? `<section class="r-sec">${notesBox(saved)}</section>` : ''}
+  </div>
   </article>`;
 }
 const fmtMin = m => m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
@@ -1003,6 +1056,8 @@ $('#stage').addEventListener('click', async e => {
   // Recept
   const chk = t.closest('[data-check]');
   if (chk) { S.checked[chk.dataset.check] = chk.checked; const row = chk.closest('.ing'); row.classList.toggle('checked', chk.checked); updateCount(); return; }
+  const rp = t.closest('[data-rport]');
+  if (rp) { const r = S.current.recipe; const n = Math.max(1, Math.min(24, portionsFor(r) + +rp.dataset.rport)); S.portions = { title: r.title, n }; keepScroll(renderStage); return; }
   const jump = t.closest('[data-jump]');
   if (jump) { scrollToSec(jump.dataset.jump); return; }
   if (t.closest('[data-startcook]')) { if (S.activeStep == null) S.activeStep = 0; refreshSteps(); scrollToSec('r-steps'); return; }
@@ -1084,9 +1139,15 @@ function updateCount() {
   if (a) a.textContent = `${r.ingredients.filter(i => S.checked[i.id]).length}/${r.ingredients.length}`;
   if (b) b.textContent = `${r.steps.filter((_, n) => S.doneSteps[n]).length}/${r.steps.length}`;
 }
+function keepScroll(fn) {
+  const els = ['#stage', '#r-ing', '#r-steps'].map(q => [q, $(q)?.scrollTop || 0]);
+  fn();
+  els.forEach(([q, top]) => { const el = $(q); if (el) el.scrollTop = top; });
+}
 function scrollToSec(id) {
   const el = document.getElementById(id), st = $('#stage'), nav = $('.r-jump');
   if (!el) return;
+  if (st.classList.contains('split')) { if (id === 'r-steps') { const a = el.querySelector('.step.active'); if (a) a.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } return; }
   const top = el.getBoundingClientRect().top - st.getBoundingClientRect().top + st.scrollTop - (nav ? nav.offsetHeight + 8 : 0);
   st.scrollTo({ top, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }

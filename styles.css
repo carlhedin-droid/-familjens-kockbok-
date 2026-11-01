@@ -15,7 +15,7 @@
   --r-lg: 18px;
   --r-md: 12px;
   --r-sm: 8px;
-  --chat-w: clamp(320px, 30vw, 420px);
+  --chat-w: clamp(360px, 36vw, 540px);
   --tab-w: 44px;
   --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
@@ -371,7 +371,7 @@ h1, h2, h3 { font-family: var(--font-display); line-height: 1.12; margin: 0; let
   .step { grid-template-columns: 34px 1fr; gap: 6px 10px; }
   .step::before { font-size: 28px; }
   .step-text { font-size: 17.5px; }
-  .app[data-chat="open"] { grid-template-rows: auto minmax(0, 1fr) 46%; }
+  .app[data-chat="open"] { grid-template-rows: auto minmax(0, 1fr) 62%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -442,3 +442,54 @@ details.adv[open] summary { margin-bottom: 8px; }
 .day-col .hint { margin: 0; font-size: 14px; color: var(--muted); }
 .seg.wrap { flex-wrap: wrap; border-radius: 18px; }
 .status-pop .chips .chip { padding: 6px 12px; font-size: 14px; }
+
+/* ---------- Receptvy: portioner, stäng, liggande delad vy ---------- */
+.r-head { position: relative; padding-right: 48px; }
+.r-close { position: absolute; top: -6px; right: -6px; }
+.r-meta .r-actions { margin: 0 0 0 auto; }
+.btn.small { min-height: 36px; padding: 6px 16px; font-size: 15px; }
+.stepper.portions { margin-left: auto; }
+.stepper.portions output { min-width: 0; padding: 0 4px; font-size: 16px; font-weight: 700; }
+.stepper.portions button { width: 40px; height: 38px; }
+.steps .sec-head .stepper { display: none; }
+.r-split { display: block; }
+
+.stage.split { overflow: hidden; display: flex; flex-direction: column; padding-top: 16px; padding-bottom: 14px; }
+.stage.split .recipe { flex: 1; min-height: 0; display: flex; flex-direction: column; max-width: none; }
+.stage.split .r-head { margin-bottom: 12px; }
+.stage.split .r-head h1 { font-size: clamp(22px, 2.6vw, 32px); }
+.stage.split .r-meta { margin-top: 6px; }
+.stage.split .r-intro, .stage.split .r-jump, .stage.split .start-cook, .stage.split .step-hint { display: none; }
+.stage.split .r-split { flex: 1; min-height: 0; display: grid; gap: 16px;
+  grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr); grid-template-areas: "steps ing"; }
+.stage.split #r-steps { grid-area: steps; }
+.stage.split #r-ing { grid-area: ing; }
+.stage.split .r-sec { margin: 0; overflow-y: auto; overscroll-behavior: contain; padding-top: 0; }
+.stage.split .sec-head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding: 16px 0 10px; margin-bottom: 0; flex-wrap: nowrap; }
+.stage.split .sec-head h2 { font-size: 22px; }
+.stage.split .steps .sec-head .stepper { display: inline-flex; }
+.stage.split .ingredients .sec-head .stepper { display: none; }
+.stage.split .ing { padding: 9px 8px; font-size: 17px; }
+.stage.split .step { padding: 14px 10px; }
+.stage.split .step-text { font-size: 18px; }
+.stage.split .extras { margin-top: 18px; }
+.stage.split .notes-wrap { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.extras { margin-top: 20px; }
+.notes-wrap .notes-box { margin: 0; padding: 0; border: 0; }
+.notes-wrap { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+
+/* Mobil i liggande läge: lite höjd – göm toppmenyn i receptet */
+@media (orientation: landscape) and (max-height: 520px) {
+  .app:has(.stage.split) .topbar { display: none; }
+  .stage.split { padding-top: 10px; padding-bottom: 8px; }
+  .stage.split .r-head { margin-bottom: 8px; }
+  .stage.split .r-head h1 { font-size: 20px; }
+  .stage.split .r-origin { display: none; }
+  .stage.split .sec-head { padding: 10px 0 6px; }
+  .stage.split .sec-head h2 { font-size: 18px; }
+  .stage.split .ing { padding: 7px 6px; font-size: 16px; }
+  .stage.split .step { padding: 10px 8px; grid-template-columns: 34px 1fr; }
+  .stage.split .step::before { font-size: 26px; }
+  .stage.split .step-text { font-size: 16.5px; }
+  .chat-tab { bottom: 16px; }
+}
