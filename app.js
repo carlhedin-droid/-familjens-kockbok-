@@ -902,7 +902,7 @@ function viewHome() {
     <h1>Vad har ni, och vad är ni sugna på?</h1>
     <p class="day-line">${hint}</p>
     <form class="asker" id="homeAsk">
-      <textarea id="homeInput" placeholder="T.ex. Vi har kycklinglår, vitkål och kokosmjölk – något starkt. Eller klistra in en receptlänk." aria-label="Beskriv vad ni har och vad ni vill ha"></textarea>
+      <textarea id="homeInput" placeholder="Vad har ni hemma? T.ex. kycklinglår, vitkål och kokosmjölk – något starkt.&#10;&#10;Eller klistra in en länk till ett recept så renskriver souschefen det åt er." aria-label="Beskriv vad ni har och vad ni vill ha"></textarea>
       <div class="attach-preview" id="homeAttach" ${S.homeAttach ? '' : 'hidden'}>${S.homeAttach ? `<img src="${S.homeAttach.url}" alt=""><span>Foto bifogat</span>` : ''}</div>
       <div class="asker-row">
         <label class="ghost" title="Fota kylen eller skafferiet">
@@ -910,7 +910,8 @@ function viewHome() {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
           Foto
         </label>
-        <button class="btn" type="submit">Ge oss förslag</button>
+        <span class="ask-hint" id="askHint">🔗 Klistra in en receptlänk så renskrivs receptet med era portioner</span>
+        <button class="btn" type="submit" id="askBtn">Ge oss förslag</button>
       </div>
     </form>
     <div class="quick">
@@ -1279,6 +1280,12 @@ function bindStage() {
       else if (q.length > 250 && q.split('\n').length > 4) q = `Renskriv det här receptet:\n${q}`;
       send(q || (img ? 'Det här har vi hemma. Ge förslag.' : ''), img, { flow: true });
     };
+    const updAsk = () => {
+      const v = $('#homeInput').value, isLink = /https?:\/\/\S+/.test(v), isPaste = v.length > 250 && v.split('\n').length > 4;
+      $('#askBtn').textContent = isLink || isPaste ? 'Renskriv receptet' : 'Ge oss förslag';
+      $('#askHint').textContent = isLink ? `🔗 Länk från ${(() => { try { return new URL(v.match(/https?:\/\/\S+/)[0]).hostname.replace(/^www\./, ''); } catch { return 'webben'; } })()} – receptet renskrivs troget med era portioner` : isPaste ? '📋 Recepttext – renskrivs med era portioner' : '🔗 Klistra in en receptlänk så renskrivs receptet med era portioner';
+    };
+    $('#homeInput').addEventListener('input', updAsk);
     $('#homeInput').onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) homeAsk.requestSubmit(); };
     $('#homeFile').onchange = async e => {
       const f = e.target.files[0]; if (!f) return;

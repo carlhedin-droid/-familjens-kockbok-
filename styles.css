@@ -530,3 +530,7 @@ details.adv[open] summary { margin-bottom: 8px; }
 @media (max-width: 760px) { .w-card { padding: 20px 18px; } }
 
 .r-source { color: var(--pandan); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+.ask-hint { flex: 1 1 200px; font-size: 14px; color: var(--muted); min-width: 0; }
+.asker-row .btn { margin-left: 0; }
+@media (max-width: 520px) { .ask-hint { order: 3; flex-basis: 100%; } .asker-row .btn { margin-left: auto; } }
