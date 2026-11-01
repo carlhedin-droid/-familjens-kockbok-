@@ -239,7 +239,7 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 
 function freshData() {
   return { v: 1, prefs: JSON.parse(JSON.stringify(DEFAULT_PREFS)), instructions: DEFAULT_INSTRUCTIONS, profile: DEFAULT_PROFILE, textUpdatedAt: '1970-01-01T00:00:00.000Z',
-           memory: [], recipes: [], deleted: {} };
+           memory: [], recipes: [], deleted: {}, session: null, history: [] };
 }
 const S = {
   settings: Object.assign({ provider: 'gemini', geminiKey: '', geminiModel: DEFAULT_MODELS.gemini,
@@ -304,6 +304,68 @@ function saveChat() {
 function saveData(opts = {}) {
   LS.set('fk.data', S.data);
   if (!opts.noSync) scheduleSync();
+}
+
+/* ============ Pågående matlagning & historik (synkas mellan enheter) ============ */
+if (!S.settings.deviceId) { S.settings.deviceId = uid(); saveSettings(); }
+function deviceName() {
+  const ua = navigator.userAgent;
+  if (/iPad|Tablet|SM-X|SM-T/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua)) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua))) return 'plattan';
+  if (/Mobi|iPhone|Android/i.test(ua)) return 'mobilen';
+  return 'datorn';
+}
+function recipeKey(r) { return (r?.title || '').trim().toLowerCase(); }
+function newSession() {
+  S.current.sessionId = uid();
+}
+let sessionTimer = null;
+function saveSession() {
+  const r = S.current.recipe;
+  if (!r || S.route.view !== 'recipe') return;
+  if (!S.current.sessionId) newSession();
+  clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(() => {
+    S.data.session = {
+      id: S.current.sessionId, recipe: r, savedId: S.current.recipeSavedId || null,
+      checked: S.checked, doneSteps: S.doneSteps, activeStep: S.activeStep,
+      portions: S.portions, chat: S.chat.filter(m => !m.hidden).slice(-30).map(m => ({ ...m, image: undefined, view: undefined })),
+      device: S.settings.deviceId, deviceName: deviceName(), updatedAt: now(), ended: false,
+    };
+    saveData();
+  }, 600);
+}
+function addHistory(r, savedId) {
+  if (!r) return;
+  const key = recipeKey(r);
+  S.data.history = (S.data.history || []).filter(h => recipeKey(h.recipe) !== key);
+  S.data.history.unshift({ id: uid(), recipe: r, savedId: savedId || null, viewedAt: now() });
+  S.data.history = S.data.history.slice(0, 15);
+  saveData();
+}
+function applySession(ss) {
+  S.current.recipe = ss.recipe; S.current.recipeSavedId = ss.savedId || null; S.current.dirty = false;
+  S.current.sessionId = ss.id;
+  S.checked = ss.checked || {}; S.doneSteps = ss.doneSteps || {}; S.activeStep = ss.activeStep ?? null;
+  S.portions = ss.portions || null;
+  if (Array.isArray(ss.chat)) S.chat = ss.chat;
+  saveCurrent(); saveChat();
+}
+function otherSession() {
+  const ss = S.data.session;
+  if (!ss || ss.ended || !ss.recipe) return null;
+  if (ss.id === S.current.sessionId) return null;
+  if (Date.now() - new Date(ss.updatedAt).getTime() > 12 * 3600e3) return null;
+  return ss;
+}
+function sessionBanner() {
+  const ss = otherSession(); if (!ss) return '';
+  const total = ss.recipe.steps?.length || 0;
+  const done = Object.values(ss.doneSteps || {}).filter(Boolean).length;
+  const at = new Date(ss.updatedAt).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+  const where = ss.device === S.settings.deviceId ? 'här' : `på ${ss.deviceName || 'en annan enhet'}`;
+  const pos = ss.activeStep != null ? `steg ${ss.activeStep + 1} av ${total}` : done ? `${done} av ${total} steg klara` : 'inte påbörjad';
+  return `<div class="resume"><div><strong>Fortsätt: ${esc(ss.recipe.title)}</strong><span class="muted">Startad ${where} ${at} · ${pos}</span></div>
+    <div class="row"><button class="btn" data-resume>Fortsätt</button><button class="ghost small" data-endsession>Avsluta</button></div></div>`;
 }
 
 /* ============ Hjälpare ============ */
@@ -641,12 +703,15 @@ async function send(text, image, opts = {}) {
     const sugg = Array.isArray(o.suggestions) && o.suggestions.length ? o.suggestions : null;
     if (recipe) {
       const keepId = S.route.view === 'recipe' ? S.current.recipeSavedId : null;
+      const sameDish = S.route.view === 'recipe' && S.current.recipe;
       S.current.recipe = recipe; S.current.recipeSavedId = keepId; S.current.dirty = !!keepId;
-      S.checked = {}; S.doneSteps = {}; S.activeStep = null;
+      if (!sameDish) { S.checked = {}; S.doneSteps = {}; S.activeStep = null; newSession(); }
+      addHistory(recipe, keepId);
       if (!(S.portions && S.portions.title === recipe.title)) S.portions = null;
       msg.view = { recipe };
       if (flow) msg.hidden = true; else msg.updated = true;
       if (S.route.view !== 'recipe') go('recipe', { keepChat: true }); else { const sc = $('#stage').scrollTop; renderStage(); $('#stage').scrollTop = sc; }
+      saveSession();
     } else if (sugg) {
       S.current.suggestions = sugg; S.current.suggIntro = o.reply || '';
       msg.view = { suggestions: sugg };
@@ -665,6 +730,7 @@ async function send(text, image, opts = {}) {
     if (!recipe && !sugg) { userMsg.hidden = false; msg.hidden = false; openChat(true); }
     S.chat.push(msg);
     saveCurrent();
+    if (S.route.view === 'recipe') saveSession();
   } catch (e) {
     const nokey = e.message === 'NOKEY';
     S.chat.push({ role: 'error', text: nokey ? 'Souschefen behöver en gratis Gemini-nyckel. Lägg in den under Inställningar.' : `Det gick inte att nå souschefen: ${e.message}`, nokey, at: now() });
@@ -788,11 +854,12 @@ function viewHome() {
   const t = todayTime();
   const gear = d.weekend && P.weekendGear ? ['Kolgrill', 'Sous vide', 'Rökskåp', 'Pizzaugn'].filter(x => P.equipment.includes(x) || P.customEquipment.includes(x)).slice(0, 2).map(x => x.toLowerCase()) : [];
   const hint = `${d.manual ? (d.weekend ? 'Helgläge' : 'Vardagsläge') : `Det är <strong>${d.name}</strong> – ${d.weekend ? 'helg' : 'vardag'}`}. Tidsram <strong>${t.label}</strong>${d.weekend ? (gear.length ? `, gärna ${gear.join(' eller ')}` : ', gärna ett projekt') : ', lite disk'}. <button class="linkish" data-status>Ändra</button>`;
-  const recent = S.data.recipes.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 4);
+  const hist = (S.data.history || []).slice(0, 6);
   if (S.busy === 'flow') {
     return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Souschefen tänker…</span></div></section>`;
   }
   return `<section class="home">
+    ${sessionBanner()}
     <h1>Vad har ni, och vad är ni sugna på?</h1>
     <p class="day-line">${hint}</p>
     <form class="asker" id="homeAsk">
@@ -819,7 +886,11 @@ function viewHome() {
     ${S.current.recipe || S.current.suggestions ? `<div class="row" style="margin:-20px 0 32px">
       ${S.current.recipe ? `<button class="ghost" data-go="recipe">Fortsätt med ${esc(S.current.recipe.title)}</button>` : ''}
       ${S.current.suggestions ? `<button class="ghost" data-go="suggestions">Senaste förslagen</button>` : ''}</div>` : ''}
-    ${recent.length ? `<h2>Senast i kokboken</h2><div class="recent">${recent.map(bookRow).join('')}</div>` : ''}
+    ${hist.length ? `<h2>Senaste recept</h2><div class="recent">${hist.map(h => `<button class="book-row" data-hist="${h.id}">
+      <h3><span class="origin">${flags(h.recipe)}</span>${esc(h.recipe.title)}</h3>
+      <span class="rt">${h.savedId && S.data.recipes.some(x => x.id === h.savedId) ? '<span title="Finns i kokboken">📖</span>' : ''}</span>
+      <span class="sub">${esc([h.recipe.origin, h.recipe.time, new Date(h.viewedAt).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })].filter(Boolean).join(', '))}</span>
+    </button>`).join('')}</div>` : ''}
   </section>`;
 }
 function potSvg() {
@@ -1126,18 +1197,22 @@ $('#stage').addEventListener('click', async e => {
 
   // Recept
   const chk = t.closest('[data-check]');
-  if (chk) { S.checked[chk.dataset.check] = chk.checked; const row = chk.closest('.ing'); row.classList.toggle('checked', chk.checked); updateCount(); return; }
+  if (chk) { S.checked[chk.dataset.check] = chk.checked; const row = chk.closest('.ing'); row.classList.toggle('checked', chk.checked); updateCount(); saveSession(); return; }
   const rp = t.closest('[data-rport]');
-  if (rp) { const r = S.current.recipe; const n = Math.max(1, Math.min(24, portionsFor(r) + +rp.dataset.rport)); S.portions = { title: r.title, n }; keepScroll(renderStage); return; }
+  if (rp) { const r = S.current.recipe; const n = Math.max(1, Math.min(24, portionsFor(r) + +rp.dataset.rport)); S.portions = { title: r.title, n }; keepScroll(renderStage); saveSession(); return; }
+  if (t.closest('[data-resume]')) { const ss = otherSession(); if (ss) { applySession(ss); go('recipe'); renderChat(true); saveSession(); } return; }
+  if (t.closest('[data-endsession]')) { if (S.data.session) { S.data.session.ended = true; S.data.session.updatedAt = now(); saveData(); } renderStage(); return; }
+  const oh = t.closest('[data-hist]');
+  if (oh) { const h = (S.data.history || []).find(x => x.id === oh.dataset.hist); if (h) { const saved = h.savedId && S.data.recipes.find(x => x.id === h.savedId); S.current.recipe = JSON.parse(JSON.stringify(saved || h.recipe)); S.current.recipeSavedId = saved ? saved.id : null; S.current.dirty = false; S.checked = {}; S.doneSteps = {}; S.activeStep = null; S.portions = null; newSession(); S.chat = []; saveChat(); saveCurrent(); go('recipe'); addHistory(S.current.recipe, S.current.recipeSavedId); saveSession(); } return; }
   const jump = t.closest('[data-jump]');
   if (jump) { scrollToSec(jump.dataset.jump); return; }
-  if (t.closest('[data-startcook]')) { if (S.activeStep == null) S.activeStep = 0; refreshSteps(); scrollToSec('r-steps'); return; }
+  if (t.closest('[data-startcook]')) { if (S.activeStep == null) S.activeStep = 0; refreshSteps(); scrollToSec('r-steps'); saveSession(); return; }
   const tm = t.closest('[data-timer]');
   if (tm) { const s = S.current.recipe.steps[+tm.dataset.timer]; startTimer(`Steg ${+tm.dataset.timer + 1}`, s.minutes); return; }
   const dn = t.closest('[data-done]');
-  if (dn) { const n = +dn.dataset.done; S.doneSteps[n] = !S.doneSteps[n]; if (S.doneSteps[n] && S.activeStep === n) S.activeStep = n + 1 < S.current.recipe.steps.length ? n + 1 : null; refreshSteps(); return; }
+  if (dn) { const n = +dn.dataset.done; S.doneSteps[n] = !S.doneSteps[n]; if (S.doneSteps[n] && S.activeStep === n) S.activeStep = n + 1 < S.current.recipe.steps.length ? n + 1 : null; refreshSteps(); saveSession(); return; }
   const step = t.closest('[data-step]');
-  if (step && !t.closest('button')) { const n = +step.dataset.step; S.activeStep = S.activeStep === n ? null : n; refreshSteps(); return; }
+  if (step && !t.closest('button')) { const n = +step.dataset.step; S.activeStep = S.activeStep === n ? null : n; refreshSteps(); saveSession(); return; }
   if (t.closest('[data-save]')) { saveRecipe(); return; }
   if (t.closest('[data-cooked]')) { const r = savedRecipe(); r.cooked = [...(r.cooked || []), now()]; touch(r); saveData(); toast('Antecknat! Sätt gärna betyg och skriv vad som blev bra.'); renderStage(); const n = $('#notes'); if (n) n.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   const rate = t.closest('[data-rate]');
@@ -1155,7 +1230,7 @@ $('#stage').addEventListener('click', async e => {
   const op = t.closest('[data-open]');
   if (op) {
     const r = S.data.recipes.find(x => x.id === op.dataset.open);
-    if (r) { S.current.recipe = JSON.parse(JSON.stringify(r)); S.current.recipeSavedId = r.id; S.current.dirty = false; S.checked = {}; S.doneSteps = {}; S.activeStep = null; saveCurrent(); go('recipe'); }
+    if (r) { S.current.recipe = JSON.parse(JSON.stringify(r)); S.current.recipeSavedId = r.id; S.current.dirty = false; S.checked = {}; S.doneSteps = {}; S.activeStep = null; newSession(); saveCurrent(); go('recipe'); addHistory(r, r.id); saveSession(); }
     return;
   }
   const fl = t.closest('[data-filter]');
@@ -1337,6 +1412,7 @@ function tickTimers() {
   }).join('');
 }
 setInterval(() => { if (S.timers.length) tickTimers(); }, 1000);
+setInterval(() => { if (document.visibilityState === 'visible' && ['recipe', 'home'].includes(S.route.view)) syncNow(); }, 20000);
 $('#timers').addEventListener('click', e => {
   const b = e.target.closest('[data-tid]'); if (!b) return;
   const t = S.timers.find(x => x.id === b.dataset.tid);
@@ -1423,7 +1499,14 @@ async function syncNow(manual) {
       if (!up.ok) { const e = await up.json().catch(() => ({})); throw new Error(e.message || up.status); }
     }
     setSync('Synkad', 'Senast ' + new Date().toLocaleTimeString('sv-SE'));
-    if (before !== merged) { renderStatus(); if (['book', 'home', 'settings'].includes(S.route.view)) renderStage(); }
+    if (before !== merged) {
+      renderStatus();
+      const ss = S.data.session;
+      if (S.route.view === 'recipe' && ss && ss.id === S.current.sessionId && ss.device !== S.settings.deviceId) {
+        // Samma matlagning pågår på annan enhet: ta in bockar, steg och chatt
+        applySession(ss); keepScroll(renderStage); renderChat(true);
+      } else if (['book', 'home', 'settings'].includes(S.route.view)) renderStage();
+    }
     if (manual) toast('Kokboken är synkad');
   } catch (e) {
     setSync('Synk misslyckades', String(e.message || e));
@@ -1433,7 +1516,7 @@ async function syncNow(manual) {
 function canon(d) {
   const recipes = (d.recipes || []).slice().sort((a, b) => a.id.localeCompare(b.id)).map(r => r.id + '|' + (r.updatedAt || ''));
   const memory = (d.memory || []).map(m => m.id + '|' + (m.updatedAt || '')).sort();
-  return JSON.stringify([d.textUpdatedAt, recipes, memory, Object.keys(d.deleted || {}).sort()]);
+  return JSON.stringify([d.textUpdatedAt, recipes, memory, Object.keys(d.deleted || {}).sort(), d.session?.updatedAt || '', (d.history || []).map(h => h.id + '|' + h.viewedAt)]);
 }
 function mergeData(remote) {
   const L = S.data, R = Object.assign(freshData(), remote || {});
@@ -1447,6 +1530,10 @@ function mergeData(remote) {
   L.memory = [...mem.values()].sort((a, b) => (a.at || '').localeCompare(b.at || ''));
   if ((R.textUpdatedAt || '') > (L.textUpdatedAt || '')) { L.instructions = R.instructions; L.profile = R.profile; if (R.prefs) L.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), R.prefs); L.textUpdatedAt = R.textUpdatedAt; }
   L.deleted = deleted;
+  if (R.session && (!L.session || (R.session.updatedAt || '') > (L.session.updatedAt || ''))) L.session = R.session;
+  const hm = new Map();
+  [...(R.history || []), ...(L.history || [])].forEach(h => { const k = recipeKey(h.recipe); const e = hm.get(k); if (!e || (h.viewedAt || '') > (e.viewedAt || '')) hm.set(k, h); });
+  L.history = [...hm.values()].sort((a, b) => (b.viewedAt || '').localeCompare(a.viewedAt || '')).slice(0, 15);
   migrateData();
 }
 async function copyShareLink() {
