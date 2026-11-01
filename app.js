@@ -616,9 +616,9 @@ function partialReply(acc) {
   try { return JSON.parse('"' + m[1].replace(/\\$/, '') + '"'); } catch { return m[1].replace(/\\n/g, '\n'); }
 }
 function showProgress(acc, override) {
-  const what = override ? override : /"recipe"\s*:\s*\{/.test(acc) ? 'Kocken skriver receptet…'
-    : /"suggestions"\s*:\s*\[/.test(acc) ? `Kocken plockar fram förslag… (${(acc.match(/"name"\s*:/g) || []).length} hittills)`
-    : 'Kocken tänker…';
+  const what = override ? override : /"recipe"\s*:\s*\{/.test(acc) ? 'Souschefen skriver receptet…'
+    : /"suggestions"\s*:\s*\[/.test(acc) ? `Souschefen plockar fram förslag… (${(acc.match(/"name"\s*:/g) || []).length} hittills)`
+    : 'Souschefen tänker…';
   const st = document.getElementById('stageStatus'); if (st) st.textContent = what;
   const live = document.getElementById('liveReply');
   const r = partialReply(acc);
@@ -654,7 +654,7 @@ async function send(text, image, opts = {}) {
       go('suggestions', { keepChat: true });
     }
     const learned = (Array.isArray(o.learn) ? o.learn : []).map(s => cleanReply(s)).filter(x => x.length > 3);
-    if (!recipe && !sugg && !msg.text) { msg.text = 'Kocken gav inget svar på det. Försök formulera om frågan.'; msg.placeholder = true; }
+    if (!recipe && !sugg && !msg.text) { msg.text = 'Souschefen gav inget svar på det. Försök formulera om frågan.'; msg.placeholder = true; }
     if (learned.length) {
       const existing = new Set(S.data.memory.filter(m => !m.deleted).map(m => m.text.toLowerCase()));
       const fresh = learned.filter(l => !existing.has(l.toLowerCase()));
@@ -667,7 +667,7 @@ async function send(text, image, opts = {}) {
     saveCurrent();
   } catch (e) {
     const nokey = e.message === 'NOKEY';
-    S.chat.push({ role: 'error', text: nokey ? 'Kocken behöver en gratis Gemini-nyckel. Lägg in den under Inställningar.' : `Det gick inte att nå kocken: ${e.message}`, nokey, at: now() });
+    S.chat.push({ role: 'error', text: nokey ? 'Souschefen behöver en gratis Gemini-nyckel. Lägg in den under Inställningar.' : `Det gick inte att nå souschefen: ${e.message}`, nokey, at: now() });
     openChat(true);
   } finally {
     S.busy = false; saveChat(); renderChat(true);
@@ -745,11 +745,11 @@ function renderChat(scroll) {
       if (m.role === 'error') return `<div class="msg error">${esc(m.text)}${m.nokey ? ` <button class="view-link" data-go="settings">Öppna inställningar</button>` : ''}</div>`;
       let extra = '';
       if (m.updated) extra += `<div class="learned">✓ Receptet är uppdaterat</div>`;
-      if (m.learned?.length) extra += `<div class="learned">Kocken kommer ihåg: ${m.learned.map(esc).join(' · ')}</div>`;
+      if (m.learned?.length) extra += `<div class="learned">Souschefen kommer ihåg: ${m.learned.map(esc).join(' · ')}</div>`;
       return `<div class="msg assistant">${md(m.text) || ''}${extra}</div>`;
     }).join('');
   }
-  if (S.busy === 'chat') log.insertAdjacentHTML('beforeend', `<div class="msg assistant typing" id="liveReply" aria-label="Kocken skriver"><i></i><i></i><i></i></div>`);
+  if (S.busy === 'chat') log.insertAdjacentHTML('beforeend', `<div class="msg assistant typing" id="liveReply" aria-label="Souschefen skriver"><i></i><i></i><i></i></div>`);
   $('#chatInput').disabled = false;
   $('#composer .send').disabled = !!S.busy;
   if (scroll) log.scrollTop = log.scrollHeight;
@@ -790,7 +790,7 @@ function viewHome() {
   const hint = `${d.manual ? (d.weekend ? 'Helgläge' : 'Vardagsläge') : `Det är <strong>${d.name}</strong> – ${d.weekend ? 'helg' : 'vardag'}`}. Tidsram <strong>${t.label}</strong>${d.weekend ? (gear.length ? `, gärna ${gear.join(' eller ')}` : ', gärna ett projekt') : ', lite disk'}. <button class="linkish" data-status>Ändra</button>`;
   const recent = S.data.recipes.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 4);
   if (S.busy === 'flow') {
-    return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Kocken tänker…</span></div></section>`;
+    return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Souschefen tänker…</span></div></section>`;
   }
   return `<section class="home">
     <h1>Vad har ni, och vad är ni sugna på?</h1>
@@ -827,9 +827,9 @@ function potSvg() {
 }
 
 function viewSuggestions() {
-  if (S.busy === 'flow') return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Kocken tänker…</span></div></section>`;
+  if (S.busy === 'flow') return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Souschefen tänker…</span></div></section>`;
   const list = S.current.suggestions || [];
-  if (!list.length) return `<div class="empty"><h2>Inga förslag än</h2><p>Berätta vad ni har så föreslår kocken rätter.</p><button class="btn" data-go="home">Till kocken</button></div>`;
+  if (!list.length) return `<div class="empty"><h2>Inga förslag än</h2><p>Berätta vad ni har så föreslår souschefen rätter.</p><button class="btn" data-go="home">Till start</button></div>`;
   return `<section>
     <div class="sugg-head"><h1>${list.length} förslag till ${dayInfo().name}</h1></div>
     ${S.current.suggIntro ? `<div class="sugg-intro">${md(S.current.suggIntro)}</div>` : ''}
@@ -857,7 +857,7 @@ function viewSuggestions() {
 
 function viewRecipe() {
   const r = S.current.recipe;
-  if (!r) return `<div class="empty"><h2>Inget recept öppet</h2><p>Välj ett förslag eller öppna en rätt i kockboken.</p><button class="btn" data-go="home">Till kocken</button></div>`;
+  if (!r) return `<div class="empty"><h2>Inget recept öppet</h2><p>Välj ett förslag eller öppna en rätt i kockboken.</p><button class="btn" data-go="home">Till start</button></div>`;
   const saved = S.current.recipeSavedId ? S.data.recipes.find(x => x.id === S.current.recipeSavedId) : null;
   const n = portionsFor(r), f = n / (r.servings || 4);
   const groups = [];
@@ -919,7 +919,7 @@ function viewRecipe() {
     ${r.health || r.tips?.length ? `<div class="extras">
       ${r.health ? `<div class="health"><h3>${esc(healthLabel())}</h3>${r.health.summary ? `<div>${md(r.health.summary)}</div>` : ''}
         ${r.health.tips?.length ? `<ul>${r.health.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>` : ''}
-      ${r.tips?.length ? `<div class="tips"><h3>Kockens tips</h3><ul>${r.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
+      ${r.tips?.length ? `<div class="tips"><h3>Souschefens tips</h3><ul>${r.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
     </div>` : ''}
     ${saved ? `<div class="notes-wrap">${notesBox(saved)}</div>` : ''}
   </section>
@@ -931,7 +931,7 @@ function notesBox(saved) {
   return `<div class="notes-box">
     <h3>Våra anteckningar</h3>
     <div class="row" style="margin-bottom:8px"><span class="muted">Betyg</span><span class="stars" role="radiogroup" aria-label="Betyg">${[1, 2, 3, 4, 5].map(n => `<button role="radio" aria-checked="${saved.rating === n}" aria-label="${n} av 5" class="${saved.rating >= n ? 'on' : ''}" data-rate="${n}">★</button>`).join('')}</span></div>
-    <textarea id="notes" placeholder="Vad blev bra, vad gör vi annorlunda nästa gång? Kocken läser det här.">${esc(saved.notes || '')}</textarea>
+    <textarea id="notes" placeholder="Vad blev bra, vad gör vi annorlunda nästa gång? Souschefen läser det här.">${esc(saved.notes || '')}</textarea>
     ${saved.cooked?.length ? `<div class="cooked-log">Lagad ${saved.cooked.length} ${saved.cooked.length === 1 ? 'gång' : 'gånger'}, senast ${new Date(saved.cooked[saved.cooked.length - 1]).toLocaleDateString('sv-SE')}</div>` : ''}
     <div class="row" style="margin-top:12px"><button class="ghost small danger" data-delete>Ta bort ur kockboken</button></div>
   </div>`;
@@ -980,7 +980,7 @@ function viewBook() {
       <input class="search" id="bookSearch" type="search" placeholder="Sök rätt, råvara eller anteckning" value="${esc(S.bookQuery)}" aria-label="Sök i kockboken"></div>
     <div class="filters">${f('alla', 'Alla')}${f('favoriter', 'Favoriter')}${f('vardag', 'Vardag')}${f('helg', 'Helg')}</div>
     ${S.data.recipes.length === 0
-      ? `<div class="empty"><h2>Kockboken är tom</h2><p>Be kocken om ett recept och tryck på <strong>Spara i kockboken</strong>. Betyg och anteckningar hjälper kocken att lära sig vad ni gillar.</p><button class="btn" data-go="home">Till kocken</button></div>`
+      ? `<div class="empty"><h2>Kockboken är tom</h2><p>Be souschefen om ett recept och tryck på <strong>Spara i kockboken</strong>. Betyg och anteckningar hjälper souschefen att lära sig vad ni gillar.</p><button class="btn" data-go="home">Till start</button></div>`
       : list.length ? `<div class="book-list">${list.map(bookRow).join('')}</div>` : `<p class="muted">Inget i kockboken matchar.</p>`}
   </section>`;
 }
@@ -995,7 +995,7 @@ function prefsCards() {
       <div class="field"><label>Portioner</label>
         <div class="row"><div class="stepper"><button type="button" data-portions="-1" aria-label="Färre portioner">−</button><output>${P.portions}</output><button type="button" data-portions="1" aria-label="Fler portioner">+</button></div>
         <button type="button" class="chip opt" data-pbool="bigEaters" aria-pressed="${P.bigEaters}">Vi äter mycket – räkna rejält</button></div></div>
-      <div class="field"><label for="allergies">Allergier och äter inte</label><input id="allergies" data-ptext="allergies" value="${esc(P.allergies)}" placeholder="T.ex. nötter, koriander (Sara), inga svampar till barnen"><span class="hint">Kocken bryter aldrig mot det här.</span></div>
+      <div class="field"><label for="allergies">Allergier och äter inte</label><input id="allergies" data-ptext="allergies" value="${esc(P.allergies)}" placeholder="T.ex. nötter, koriander (Sara), inga svampar till barnen"><span class="hint">Souschefen bryter aldrig mot det här.</span></div>
       <div class="field"><label for="profile">Övrigt om familjen</label><textarea id="profile" data-ptext="profile" rows="2" style="min-height:70px">${esc(S.data.profile)}</textarea></div>
     </div>
 
@@ -1047,7 +1047,7 @@ ${prefsCards()}
 
     <div class="card">
       <h2>Smakminne</h2>
-      <p>Saker kocken har lärt sig av era samtal. Ta bort det som inte stämmer, eller lägg till själv.</p>
+      <p>Saker souschefen har lärt sig av era samtal. Ta bort det som inte stämmer, eller lägg till själv.</p>
       ${mem.length ? `<ul class="memory-list">${mem.map(m => `<li><span>${esc(m.text)}</span><button class="ghost small" data-forget="${m.id}">Ta bort</button></li>`).join('')}</ul>` : '<p class="muted">Inget ännu.</p>'}
       <div class="row"><input id="memNew" class="search" placeholder="T.ex. Vi älskar sambal" style="max-width:none"><button class="ghost" data-memadd>Lägg till</button></div>
     </div>
@@ -1368,7 +1368,7 @@ async function testAI() {
   const p = S.settings.provider;
   if (!S.settings[p === 'claude' ? 'claudeKey' : 'geminiKey']) return 'Ingen nyckel ännu';
   const sysBackup = S.chat; S.chat = [{ role: 'user', text: 'Test: svara bara med reply "OK".' }];
-  try { await callModel(); return '✓ Kocken svarar'; }
+  try { await callModel(); return '✓ Souschefen svarar'; }
   catch (e) { return '✗ ' + (e.message === 'NOKEY' ? 'Ingen nyckel' : e.message); }
   finally { S.chat = sysBackup; }
 }
