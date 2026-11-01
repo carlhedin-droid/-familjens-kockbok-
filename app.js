@@ -112,7 +112,7 @@ LÄGE 2 – RECEPT (vald rätt, länk eller inklistrat recept, eller ändring)
 - Ändring: skicka hela receptet, behåll ingrediens-id och portioner om inget annat sägs.
 
 LÄGE 3 – INSPIRATION (råvaror, foto eller önskemål)
-- 5–8 förslag, vart och ett med kort "varför den passar oss" – koppla gärna till kockboken, betygen och smakminnet.
+- 5–8 förslag, vart och ett med kort "varför den passar oss" – koppla gärna till kokboken, betygen och smakminnet.
 - Vardag: flest snabba. Helg: fler ambitiösa. Alla ryms i dagens tidsram om inget annat sägs.
 - Sprid över favoritländerna; minst ett vegetariskt och minst ett tydligt nyttigare förslag.
 - Undvik rätter vi lagat den senaste veckan om vi inte ber om dem; variationer på högt betygsatta rätter är välkomna.
@@ -222,7 +222,7 @@ Regler:
 - "countries": ISO 3166-1 alfa-2-koder (versaler) för rättens ursprungsland, t.ex. ["MY"], ["FR","SE"] för fusion. Regionalt kök → huvudlandet (Sydamerikanskt ceviche → ["PE"]).
 - "group" används för att dela upp ingredienser (t.ex. "Marinad", "Sås", "Servering"); annars null.
 - "learn": bara NYA saker vi själva sagt eller tydligt visat (t.ex. "Barnen tycker inte om koriander", "Vi gillade mer chili i panangen"). Inga gissningar. Annars [].
-- Använd smakminnet och kockboken nedan för att träffa vår smak. Föreslå gärna variationer på rätter vi gett högt betyg.
+- Använd smakminnet och kokboken nedan för att träffa vår smak. Föreslå gärna variationer på rätter vi gett högt betyg.
 - Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.`;
 
 const DEFAULT_MODELS = { gemini: 'gemini-3.6-flash', claude: 'claude-sonnet-5-5' };
@@ -419,7 +419,7 @@ function buildSystem() {
       if (r.cooked?.length) bits.push(`lagad ${r.cooked.length} ggr, senast ${String(r.cooked[r.cooked.length - 1]).slice(0, 10)}`);
       const note = (r.notes || '').replace(/\s+/g, ' ').slice(0, 220);
       return `- ${r.title}${r.origin ? ` (${r.origin})` : ''}${bits.length ? ` – ${bits.join(', ')}` : ''}${note ? `. Anteckning: ${note}` : ''}`;
-    }).join('\n') || '- (kockboken är tom än så länge)';
+    }).join('\n') || '- (kokboken är tom än så länge)';
   const onScreen = S.route.view === 'recipe' && S.current.recipe
     ? JSON.stringify(stripRecipe(S.current.recipe)) + (portionsFor(S.current.recipe) !== (S.current.recipe.servings || 4) ? `\n(Vi har skalat receptet till ${portionsFor(S.current.recipe)} portioner i appen. Svara utifrån det. Ber vi om ändringar: skicka receptet för ${portionsFor(S.current.recipe)} portioner.)` : '')
     : (S.route.view === 'suggestions' && S.current.suggestions
@@ -435,7 +435,7 @@ ${S.data.profile}
 ## SMAKMINNE (det du lärt dig om oss)
 ${mem}
 
-## FAMILJENS KOCKBOK (sparade rätter, betyg och våra anteckningar)
+## FAMILJENS KOKBOK (sparade rätter, betyg och våra anteckningar)
 ${book}
 
 ## IDAG
@@ -702,7 +702,7 @@ function openChat(open) {
 $('#chatTab').addEventListener('click', () => { openChat(true); setTimeout(() => $('#chatInput').focus(), 50); });
 $('#chatClose').addEventListener('click', () => openChat(false));
 $('#chatNew').addEventListener('click', () => {
-  if (!S.chat.length || confirm('Börja en ny tråd? Den nuvarande konversationen rensas (recept i kockboken påverkas inte).')) {
+  if (!S.chat.length || confirm('Börja en ny tråd? Den nuvarande konversationen rensas (recept i kokboken påverkas inte).')) {
     S.chat = []; saveChat(); renderChat();
   }
 });
@@ -813,13 +813,13 @@ function viewHome() {
         'Nyttigt men gott – Pappas val',
         'Vegetariskt med tydlig karaktär',
         'Något malaysiskt eller singaporianskt',
-        'Laga om en favorit från kockboken',
+        'Laga om en favorit från kokboken',
       ].map(q => `<button class="chip" data-quick="${esc(q)}">${esc(q)}</button>`).join('')}
     </div>
     ${S.current.recipe || S.current.suggestions ? `<div class="row" style="margin:-20px 0 32px">
       ${S.current.recipe ? `<button class="ghost" data-go="recipe">Fortsätt med ${esc(S.current.recipe.title)}</button>` : ''}
       ${S.current.suggestions ? `<button class="ghost" data-go="suggestions">Senaste förslagen</button>` : ''}</div>` : ''}
-    ${recent.length ? `<h2>Senast i kockboken</h2><div class="recent">${recent.map(bookRow).join('')}</div>` : ''}
+    ${recent.length ? `<h2>Senast i kokboken</h2><div class="recent">${recent.map(bookRow).join('')}</div>` : ''}
   </section>`;
 }
 function potSvg() {
@@ -857,7 +857,7 @@ function viewSuggestions() {
 
 function viewRecipe() {
   const r = S.current.recipe;
-  if (!r) return `<div class="empty"><h2>Inget recept öppet</h2><p>Välj ett förslag eller öppna en rätt i kockboken.</p><button class="btn" data-go="home">Till start</button></div>`;
+  if (!r) return `<div class="empty"><h2>Inget recept öppet</h2><p>Välj ett förslag eller öppna en rätt i kokboken.</p><button class="btn" data-go="home">Till start</button></div>`;
   const saved = S.current.recipeSavedId ? S.data.recipes.find(x => x.id === S.current.recipeSavedId) : null;
   const n = portionsFor(r), f = n / (r.servings || 4);
   const groups = [];
@@ -881,7 +881,7 @@ function viewRecipe() {
       ${r.time ? `<span>${esc(r.time)}</span>` : ''}
       ${saved?.rating ? `<span style="color:var(--kunyit)">${'★'.repeat(saved.rating)}</span>` : ''}
       <span class="r-actions">
-        ${!saved ? `<button class="btn small" data-save>Spara i kockboken</button>`
+        ${!saved ? `<button class="btn small" data-save>Spara i kokboken</button>`
           : S.current.dirty ? `<button class="btn small" data-save>Spara ändringarna</button>`
           : `<button class="ghost small" data-cooked>Vi lagade den idag</button>`}
       </span>
@@ -933,7 +933,7 @@ function notesBox(saved) {
     <div class="row" style="margin-bottom:8px"><span class="muted">Betyg</span><span class="stars" role="radiogroup" aria-label="Betyg">${[1, 2, 3, 4, 5].map(n => `<button role="radio" aria-checked="${saved.rating === n}" aria-label="${n} av 5" class="${saved.rating >= n ? 'on' : ''}" data-rate="${n}">★</button>`).join('')}</span></div>
     <textarea id="notes" placeholder="Vad blev bra, vad gör vi annorlunda nästa gång? Souschefen läser det här.">${esc(saved.notes || '')}</textarea>
     ${saved.cooked?.length ? `<div class="cooked-log">Lagad ${saved.cooked.length} ${saved.cooked.length === 1 ? 'gång' : 'gånger'}, senast ${new Date(saved.cooked[saved.cooked.length - 1]).toLocaleDateString('sv-SE')}</div>` : ''}
-    <div class="row" style="margin-top:12px"><button class="ghost small danger" data-delete>Ta bort ur kockboken</button></div>
+    <div class="row" style="margin-top:12px"><button class="ghost small danger" data-delete>Ta bort ur kokboken</button></div>
   </div>`;
 }
 
@@ -976,12 +976,12 @@ function viewBook() {
   list.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
   const f = (k, l) => `<button class="chip" aria-pressed="${S.bookFilter === k}" data-filter="${k}">${l}</button>`;
   return `<section>
-    <div class="book-head"><h1>Kockboken</h1>
-      <input class="search" id="bookSearch" type="search" placeholder="Sök rätt, råvara eller anteckning" value="${esc(S.bookQuery)}" aria-label="Sök i kockboken"></div>
+    <div class="book-head"><h1>Kokboken</h1>
+      <input class="search" id="bookSearch" type="search" placeholder="Sök rätt, råvara eller anteckning" value="${esc(S.bookQuery)}" aria-label="Sök i kokboken"></div>
     <div class="filters">${f('alla', 'Alla')}${f('favoriter', 'Favoriter')}${f('vardag', 'Vardag')}${f('helg', 'Helg')}</div>
     ${S.data.recipes.length === 0
-      ? `<div class="empty"><h2>Kockboken är tom</h2><p>Be souschefen om ett recept och tryck på <strong>Spara i kockboken</strong>. Betyg och anteckningar hjälper souschefen att lära sig vad ni gillar.</p><button class="btn" data-go="home">Till start</button></div>`
-      : list.length ? `<div class="book-list">${list.map(bookRow).join('')}</div>` : `<p class="muted">Inget i kockboken matchar.</p>`}
+      ? `<div class="empty"><h2>Kokboken är tom</h2><p>Be souschefen om ett recept och tryck på <strong>Spara i kokboken</strong>. Betyg och anteckningar hjälper souschefen att lära sig vad ni gillar.</p><button class="btn" data-go="home">Till start</button></div>`
+      : list.length ? `<div class="book-list">${list.map(bookRow).join('')}</div>` : `<p class="muted">Inget i kokboken matchar.</p>`}
   </section>`;
 }
 
@@ -1039,7 +1039,7 @@ function viewSettings() {
   const mem = S.data.memory.filter(m => !m.deleted);
   const keyField = p === 'claude' ? 'claudeKey' : 'geminiKey';
   const ai = S.aiStatus || (s[keyField] ? '' : 'Ingen nyckel ännu');
-  const sync = !s.ghToken ? 'Av – kockboken finns bara på den här enheten' : (S.sync.state === 'Synkad' ? `✓ På – ${$('#sync').title || 'synkad'}` : S.sync.state || 'Kopplar…');
+  const sync = !s.ghToken ? 'Av – kokboken finns bara på den här enheten' : (S.sync.state === 'Synkad' ? `✓ På – ${$('#sync').title || 'synkad'}` : S.sync.state || 'Kopplar…');
   return `<section class="settings">
     <h1>Inställningar</h1>
 
@@ -1058,9 +1058,9 @@ ${prefsCards()}
       <div class="field"><label for="${keyField}">${p === 'claude' ? 'Claude-nyckel' : 'Gemini-nyckel (gratis)'}</label>
         <input id="${keyField}" type="password" autocomplete="off" value="${esc(s[keyField])}" placeholder="Klistra in nyckeln">
         <span class="hint">${p === 'claude' ? 'Från <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.' : 'Hämtas på <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.'}${ai ? ` <strong class="status-line">${esc(ai)}</strong>` : ''}</span></div>
-      <div class="field"><label for="ghToken">GitHub-token för att dela kockboken <span class="muted">(valfritt)</span></label>
+      <div class="field"><label for="ghToken">GitHub-token för att dela kokboken <span class="muted">(valfritt)</span></label>
         <input id="ghToken" type="password" autocomplete="off" value="${esc(s.ghToken)}" placeholder="ghp_…">
-        <span class="hint">Behövs bara om fler enheter ska se samma kockbok. <a href="https://github.com/settings/tokens/new?scopes=gist&description=Souschefen" target="_blank" rel="noopener">Skapa token</a> (bara behörigheten "gist"). <strong class="status-line">${esc(sync)}</strong></span></div>
+        <span class="hint">Behövs bara om fler enheter ska se samma kokbok. <a href="https://github.com/settings/tokens/new?scopes=gist&description=Souschefen" target="_blank" rel="noopener">Skapa token</a> (bara behörigheten "gist"). <strong class="status-line">${esc(sync)}</strong></span></div>
       <div class="row"><button class="btn" data-connect>Spara och testa</button>
         ${s[keyField] ? `<button class="ghost" data-sharelink>Kopiera länk till annan enhet</button>` : ''}</div>
       ${s[keyField] ? `<p class="hint muted" style="margin:10px 0 0;font-size:14px">Öppna länken på mobilen eller plattan så kopplas den automatiskt. Länken innehåller nycklarna – skicka den bara till er själva.</p>` : ''}
@@ -1072,7 +1072,7 @@ ${prefsCards()}
         <div class="seg" role="group"><button type="button" data-prov="gemini" aria-pressed="${p === 'gemini'}">Google Gemini</button><button type="button" data-prov="claude" aria-pressed="${p === 'claude'}">Anthropic Claude</button></div></div>
       <div class="field"><label for="${p === 'claude' ? 'claudeModel' : 'geminiModel'}">Modell</label><input id="${p === 'claude' ? 'claudeModel' : 'geminiModel'}" value="${esc(p === 'claude' ? s.claudeModel : s.geminiModel)}">
         <span class="hint">Standard: ${DEFAULT_MODELS[p]}.${p === 'gemini' ? ' Är modellen upptagen provar appen andra gratismodeller automatiskt.' : ''}</span></div>
-      <div class="field"><label for="gistId">Gist-id för delad kockbok</label><input id="gistId" value="${esc(s.gistId)}" placeholder="Hittas eller skapas automatiskt"></div>
+      <div class="field"><label for="gistId">Gist-id för delad kokbok</label><input id="gistId" value="${esc(s.gistId)}" placeholder="Hittas eller skapas automatiskt"></div>
       <div class="row" style="margin-bottom:18px"><button class="ghost" data-savekeys>Spara</button>${s.gistId ? `<button class="ghost" data-syncnow>Synka nu</button>` : ''}</div>
       <div class="field"><label>Tema</label><div class="seg" role="group">${[['auto', 'Som enheten'], ['light', 'Ljust'], ['dark', 'Mörkt']].map(([k, l]) => `<button type="button" data-theme="${k}" aria-pressed="${s.theme === k}">${l}</button>`).join('')}</div></div>
       <div class="row"><button class="ghost" data-export>Ladda ner säkerhetskopia</button>
@@ -1109,7 +1109,7 @@ function bindStage() {
   if (imp) imp.onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
     try { const d = JSON.parse(await f.text()); mergeData(d); saveData(); toast('Säkerhetskopian är inläst'); renderStage(); }
-    catch { toast('Filen kunde inte läsas som en kockbok'); }
+    catch { toast('Filen kunde inte läsas som en kokbok'); }
   };
 }
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
@@ -1144,14 +1144,14 @@ $('#stage').addEventListener('click', async e => {
   if (rate) { const r = savedRecipe(); r.rating = r.rating === +rate.dataset.rate ? 0 : +rate.dataset.rate; touch(r); saveData(); const sc = $('#stage').scrollTop; renderStage(); $('#stage').scrollTop = sc; return; }
   if (t.closest('[data-delete]')) {
     const r = savedRecipe();
-    if (r && confirm(`Ta bort "${r.title}" ur kockboken?`)) {
+    if (r && confirm(`Ta bort "${r.title}" ur kokboken?`)) {
       S.data.recipes = S.data.recipes.filter(x => x.id !== r.id); S.data.deleted[r.id] = now();
-      S.current.recipeSavedId = null; saveData(); saveCurrent(); toast('Borttagen ur kockboken'); go('book');
+      S.current.recipeSavedId = null; saveData(); saveCurrent(); toast('Borttagen ur kokboken'); go('book');
     }
     return;
   }
 
-  // Kockboken
+  // Kokboken
   const op = t.closest('[data-open]');
   if (op) {
     const r = S.data.recipes.find(x => x.id === op.dataset.open);
@@ -1194,7 +1194,7 @@ $('#stage').addEventListener('click', async e => {
   if (th) { S.settings.theme = th.dataset.theme; saveSettings(); applyTheme(); renderStage(); return; }
   if (t.closest('[data-export]')) {
     const blob = new Blob([JSON.stringify(S.data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `familjens-kockbok-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `souschefen-kokbok-${new Date().toISOString().slice(0, 10)}.json`; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 });
@@ -1251,11 +1251,11 @@ function saveRecipe() {
   const existing = savedRecipe();
   if (existing) {
     Object.assign(existing, stripRecipe(r)); touch(existing);
-    toast('Ändringarna är sparade i kockboken');
+    toast('Ändringarna är sparade i kokboken');
   } else {
     const rec = { ...stripRecipe(r), id: uid(), savedAt: now(), updatedAt: now(), notes: '', rating: 0, cooked: [] };
     S.data.recipes.push(rec); S.current.recipeSavedId = rec.id;
-    toast('Sparad i kockboken');
+    toast('Sparad i kokboken');
   }
   S.current.dirty = false; saveData(); saveCurrent(); renderStage();
 }
@@ -1395,10 +1395,10 @@ async function connectAll() {
 async function createGist() {
   if (!S.settings.ghToken) { toast('Lägg in en GitHub-token först'); return; }
   setSync('Skapar…');
-  const res = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: 'Souschefen – kockbok', public: false, files: { [DATA_FILE]: { content: JSON.stringify(S.data, null, 1) } } }) });
+  const res = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: 'Souschefen – kokbok', public: false, files: { [DATA_FILE]: { content: JSON.stringify(S.data, null, 1) } } }) });
   const j = await res.json().catch(() => ({}));
   if (!res.ok) { setSync('Synk misslyckades', j.message || ''); toast('Kunde inte skapa: ' + (j.message || res.status)); return; }
-  S.settings.gistId = j.id; saveSettings(); setSync('Synkad'); toast('Delad kockbok skapad'); renderStage();
+  S.settings.gistId = j.id; saveSettings(); setSync('Synkad'); toast('Delad kokbok skapad'); renderStage();
 }
 let syncing = false;
 async function syncNow(manual) {
@@ -1424,7 +1424,7 @@ async function syncNow(manual) {
     }
     setSync('Synkad', 'Senast ' + new Date().toLocaleTimeString('sv-SE'));
     if (before !== merged) { renderStatus(); if (['book', 'home', 'settings'].includes(S.route.view)) renderStage(); }
-    if (manual) toast('Kockboken är synkad');
+    if (manual) toast('Kokboken är synkad');
   } catch (e) {
     setSync('Synk misslyckades', String(e.message || e));
     if (manual) toast('Synk misslyckades: ' + (e.message || e));
