@@ -126,7 +126,7 @@ Allergier: inga kända.`;
 
 const PROFILE_V3 = `Två vuxna och två tonåringar (13–15 år). Vi bor på Ekerö och handlar i vanliga svenska matbutiker.`;
 const FOODIE_LINE = 'Vi är foodies med hög kunskapsnivå, särskilt inom asiatisk matlagning efter 5 år i Malaysia/Singapore.';
-const DEFAULT_PROFILE = `Två vuxna och två tonåringar (13–15 år). ${FOODIE_LINE}\nVi bor på Ekerö och handlar i vanliga svenska matbutiker.`;
+const CARL_PROFILE = `Två vuxna och två tonåringar (13–15 år). ${FOODIE_LINE}\nVi bor på Ekerö och handlar i vanliga svenska matbutiker.`;
 
 const OPT = {
   eaters: ['Tonåringar', 'Småbarn', 'Tränande / idrottare', 'Kräsna ätare', 'Storätare', 'Gäster / vänner', 'Bara vuxna'],
@@ -169,8 +169,8 @@ const DEFAULT_HEALTH = 'Volym + spets: mättande grönt som bas och en smakspets
 const STANDARD_KITCHEN = 'spis, ugn, mikro, stekpannor, kastruller (även stor gryta), ugnsformar, plåtar, stavmixer, elvisp, våg och vanliga knivar';
 const CUISINE_MAP = { Svenska: ['Sverige'], Nordiska: ['Sverige'], Franska: ['Frankrike'], Italienska: ['Italien'], Spanska: ['Spanien'], Grekiska: ['Grekland'], Libanesiska: ['Libanon'], Turkiska: ['Turkiet'], Indiska: ['Indien'], Thailändska: ['Thailand'], Malaysiska: ['Malaysia'], Singaporianska: ['Singapore'], Vietnamesiska: ['Vietnam'], Kinesiska: ['Kina'], Koreanska: ['Korea'], Japanska: ['Japan'], Amerikanska: ['USA'], Mexikanska: ['Mexiko'], Sydamerikanska: ['Peru', 'Argentina'] };
 const EQUIP_MAP = { 'Airfryer / fritös': 'Fritös', 'Bakstål': 'Bakstål / pizzasten', 'Rökskåp': 'Rökgrill / rökskåp', 'Mixer': 'Kraftfull mixer', 'Ångkokare': 'Ångugn', 'Stor soppkastrull': null };
-const DEFAULT_PREFS = {
-  portions: 4, bigEaters: true,
+const CARL_PREFS = {
+  portions: 4, bigEaters: true, foodieAdded: true,
   allergies: 'Inga kända',
   weekdayTime: '30', weekendTime: '120', weekendGear: true,
   healthWho: 'Pappa', healthNote: DEFAULT_HEALTH, healthyAlt: true,
@@ -179,6 +179,19 @@ const DEFAULT_PREFS = {
   migratedV4: true,
   customEquipment: [],
 };
+// Neutrala förval för nya familjer (fylls i via introduktionen)
+const DEFAULT_PROFILE = '';
+const DEFAULT_PREFS = {
+  portions: 4, bigEaters: false, foodieAdded: true, frozen: true,
+  allergies: '',
+  weekdayTime: '30', weekendTime: '60', weekendGear: true,
+  healthWho: '', healthNote: '', healthyAlt: false,
+  cuisines: ['Sverige', 'Italien'],
+  equipment: [],
+  migratedV4: true,
+  customEquipment: [],
+};
+const HAD_DATA = (() => { try { return !!localStorage.getItem('fk.data') || !!(JSON.parse(localStorage.getItem('fk.settings') || '{}').geminiKey); } catch { return false; } })();
 
 const S_STR = { type: 'STRING' }, S_STRN = { type: 'STRING', nullable: true }, S_ARR = { type: 'ARRAY', items: S_STR };
 const RESPONSE_SCHEMA = {
@@ -266,6 +279,13 @@ if (!S.settings.migratedGemini) {
 if (!S.settings.migrated36) { if (!S.settings.geminiModel || /3\.8|flash-latest/.test(S.settings.geminiModel)) S.settings.geminiModel = DEFAULT_MODELS.gemini; S.settings.migrated36 = true; saveSettings(); }
 // Inställningar flyttade från prompten till klickbara val
 function migrateData() {
+  if (HAD_DATA && !(S.data.prefs && S.data.prefs.frozen)) {
+    // Befintlig användare: behåll tidigare förval (fyll luckor med dem, inte med de neutrala)
+    S.data.prefs = Object.assign(JSON.parse(JSON.stringify(CARL_PREFS)), S.data.prefs || {}, { frozen: true });
+    if (!S.data.profile) S.data.profile = CARL_PROFILE;
+    S.data.textUpdatedAt = new Date().toISOString();
+    try { localStorage.setItem('fk.data', JSON.stringify(S.data)); } catch { }
+  }
   const P0 = S.data.prefs;
   if (P0 && !P0.migratedV4) {
     // Kök → länder, utrustning → bara utöver standard
@@ -287,10 +307,10 @@ function migrateData() {
   S.data.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), S.data.prefs || {});
   if (S.data.instructions === LEGACY_INSTRUCTIONS || S.data.instructions === INSTRUCTIONS_V2 || S.data.instructions === INSTRUCTIONS_V3) S.data.instructions = DEFAULT_INSTRUCTIONS;
   if (/^Periodisk fasta och styrketräning\. Mål: viktminskning/.test(S.data.prefs.healthNote || '')) S.data.prefs.healthNote = DEFAULT_HEALTH;
-  if (S.data.profile === DEFAULT_PROFILE_V2 || S.data.profile === PROFILE_V3) S.data.profile = DEFAULT_PROFILE;
+  if (S.data.profile === DEFAULT_PROFILE_V2 || S.data.profile === PROFILE_V3) S.data.profile = CARL_PROFILE;
   else if (S.data.profile && !/Malaysia|foodie/i.test(S.data.profile) && !S.data.prefs.foodieAdded) { S.data.profile = S.data.profile.trim() + '\n' + FOODIE_LINE; }
   S.data.prefs.foodieAdded = true;
-  if (S.data.profile === LEGACY_PROFILE) S.data.profile = DEFAULT_PROFILE;
+  if (S.data.profile === LEGACY_PROFILE) S.data.profile = CARL_PROFILE;
 }
 migrateData();
 if (!S.current) S.current = { suggestions: null, suggIntro: '', recipe: null, recipeSavedId: null, dirty: false };
@@ -845,6 +865,8 @@ function renderStage() {
   else if (v === 'recipe') st.innerHTML = viewRecipe();
   else if (v === 'book') st.innerHTML = viewBook();
   else if (v === 'settings') st.innerHTML = viewSettings();
+  else if (v === 'welcome') st.innerHTML = viewWelcome();
+  document.getElementById('app').classList.toggle('onboarding', v === 'welcome');
   bindStage();
 }
 
@@ -877,7 +899,7 @@ function viewHome() {
     <div class="quick">
       ${[
         d.weekend ? 'Helgprojekt ikväll' : `Snabb middag på ${todayTime().label}`,
-        'Nyttigt men gott – Pappas val',
+        `Nyttigt men gott${S.data.prefs.healthWho ? ' – ' + healthLabel() : ''}`,
         'Vegetariskt med tydlig karaktär',
         'Något malaysiskt eller singaporianskt',
         'Laga om en favorit från kokboken',
@@ -1105,6 +1127,78 @@ function prefsCards() {
     </div>`;
 }
 
+/* ============ Introduktion för nya familjer ============ */
+const W_STEPS = ['Välkommen', 'Nyckel', 'Hushållet', 'Vardag och helg', 'Smak', 'Hälsa', 'Utrustning', 'Klart'];
+function viewWelcome() {
+  const k = S.wStep || 0, P = S.data.prefs, s = S.settings;
+  const seg = (key, opts) => `<div class="seg wrap" role="group">${opts.map(([v, l]) => `<button type="button" data-pset="${key}" data-val="${v}" aria-pressed="${P[key] === v}">${l}</button>`).join('')}</div>`;
+  const chip = (key, val, label = val) => `<button type="button" class="chip opt" data-ptoggle="${key}" data-val="${esc(val)}" aria-pressed="${P[key].includes(val)}">${label}</button>`;
+  let body = '';
+  if (k === 0) body = `
+    <h1>Välkommen till Souschefen</h1>
+    <p class="w-lead">Berätta vad ni har hemma, eller fota kylen, så föreslår souschefen middagar och skriver receptet efter er familj. Under matlagningen kan ni ställa frågor, och era favoriter sparas i kokboken.</p>
+    <p>Det tar ungefär fem minuter att komma igång. Allt kan ändras senare under Inställningar.</p>
+    <p class="hint">Har ni redan Souschefen på en annan enhet? Öppna i stället länken från <em>Inställningar → Koppling → Kopiera länk till annan enhet</em> där.</p>`;
+  else if (k === 1) body = `
+    <h1>Koppla souschefen</h1>
+    <p class="w-lead">Souschefen använder Googles AI Gemini. Ni behöver en egen gratis nyckel, och det kostar inget.</p>
+    <ol class="w-steps"><li>Öppna <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> och logga in med ert Google-konto.</li><li>Tryck på <strong>Create API key</strong> och kopiera nyckeln.</li><li>Klistra in den här:</li></ol>
+    <div class="field"><input id="geminiKey" type="password" autocomplete="off" value="${esc(s.geminiKey)}" placeholder="Klistra in nyckeln"></div>
+    <div class="row"><button class="ghost" data-wtest>Testa nyckeln</button>${S.aiStatus ? `<strong class="status-line" style="display:inline">${esc(S.aiStatus)}</strong>` : ''}</div>
+    <p class="hint">Nyckeln sparas bara på den här enheten. På gratisnivån får Google använda frågorna för att förbättra sina tjänster.</p>`;
+  else if (k === 2) body = `
+    <h1>Hushållet</h1>
+    <div class="field"><label>Hur många portioner lagar ni oftast?</label>
+      <div class="row"><div class="stepper"><button type="button" data-portions="-1" aria-label="Färre">−</button><output>${P.portions}</output><button type="button" data-portions="1" aria-label="Fler">+</button></div>
+      <button type="button" class="chip opt" data-pbool="bigEaters" aria-pressed="${P.bigEaters}">Vi äter mycket – räkna rejält</button></div></div>
+    <div class="field"><label for="profile">Berätta kort om er</label><textarea id="profile" data-ptext="profile" rows="3" placeholder="T.ex. två vuxna och två tonåringar. Vana i köket, gillar starkt. Handlar på ICA.">${esc(S.data.profile)}</textarea></div>
+    <div class="field"><label for="allergies">Allergier och sådant någon inte äter</label><input id="allergies" data-ptext="allergies" value="${esc(P.allergies)}" placeholder="T.ex. nötter, koriander, inga svampar"><span class="hint">Souschefen bryter aldrig mot det här.</span></div>`;
+  else if (k === 3) body = `
+    <h1>Vardag och helg</h1>
+    <p class="w-lead">Hur mycket tid har ni för matlagningen? Appen väljer vardag eller helg efter veckodagen, och ni kan ändra det för stunden uppe till höger.</p>
+    <div class="day-cols">
+      <div class="day-col"><h3>Vardag <span class="muted">mån–tor</span></h3>${seg('weekdayTime', TIMES.slice(0, 3))}</div>
+      <div class="day-col"><h3>Helg <span class="muted">fre–sön</span></h3>${seg('weekendTime', TIMES.slice(3))}
+        <div style="margin-top:10px"><button type="button" class="chip opt" data-pbool="weekendGear" aria-pressed="${P.weekendGear}">Använd gärna specialutrustning på helgen</button></div></div>
+    </div>`;
+  else if (k === 4) body = `
+    <h1>Vilken mat gillar ni?</h1>
+    <p class="w-lead">Välj de länders kök ni tycker om. Förslagen sprids över dem.</p>
+    ${OPT.cuisines.map(([reg, list]) => `<div class="opt-group"><h3>${esc(reg)}</h3><div class="chips">${list.map(([cc, name]) => `<button type="button" class="chip opt flagchip" data-ptoggle="cuisines" data-val="${esc(name)}" aria-pressed="${P.cuisines.includes(name)}">${flags({ countries: [cc] })}${esc(name)}</button>`).join('')}</div></div>`).join('')}`;
+  else if (k === 5) body = `
+    <h1>Hälsa <span class="muted" style="font-size:.5em">valfritt</span></h1>
+    <p class="w-lead">Har någon i familjen ett mål med maten? Då anpassar souschefen recepten och föreslår ett lättare alternativ.</p>
+    <div class="field"><label for="healthWho">Gäller</label><input id="healthWho" data-ptext="healthWho" value="${esc(P.healthWho)}" placeholder="T.ex. Pappa, alla – lämna tomt om inget"></div>
+    <div class="field"><label for="healthNote">Målet med egna ord</label><textarea id="healthNote" data-ptext="healthNote" rows="3" placeholder="T.ex. mer protein, mindre socker, gå ner lite i vikt men maten ska vara god">${esc(P.healthNote)}</textarea></div>
+    <button type="button" class="chip opt" data-pbool="healthyAlt" aria-pressed="${P.healthyAlt}">Avsluta alltid receptet med ett lättare alternativ</button>`;
+  else if (k === 6) body = `
+    <h1>Specialutrustning</h1>
+    <p class="w-lead">Bocka i det ni har utöver ett vanligt kök. Spis, ugn, stekpannor, kastruller och stavmixer räknas alltid med.</p>
+    ${OPT.equipment.map(([grp, list]) => `<div class="opt-group"><h3>${esc(grp)}</h3><div class="chips">${list.map(v => chip('equipment', v)).join('')}</div></div>`).join('')}`;
+  else body = `
+    <h1>Klart!</h1>
+    <p class="w-lead">Souschefen är redo. Skriv vad ni har hemma, fota kylen eller välj ett av snabbvalen på startsidan.</p>
+    <ul class="w-tips"><li><strong>Fråga souschefen</strong> finns i kanten. Där kan ni ställa frågor medan ni lagar och be om ändringar i receptet.</li>
+    <li>Spara favoriter i <strong>Kokboken</strong> och ge dem betyg. Souschefen lär sig vad ni gillar.</li>
+    <li>Lägg appen på hemskärmen via webbläsarens meny.</li>
+    <li>Vill flera i familjen dela kokboken mellan mobiler: se <em>Inställningar → Koppling</em>.</li></ul>`;
+  const last = W_STEPS.length - 1;
+  return `<section class="welcome">
+    <div class="w-progress" aria-label="Steg ${k + 1} av ${W_STEPS.length}">${W_STEPS.map((n, i) => `<span class="${i < k ? 'done' : i === k ? 'on' : ''}" title="${n}"></span>`).join('')}</div>
+    <div class="w-card">${body}</div>
+    <div class="w-nav">
+      ${k > 0 ? `<button class="ghost" data-wnav="-1">Tillbaka</button>` : '<span></span>'}
+      ${k === 0 ? `<button class="linkish" data-wskip>Hoppa över</button>` : ''}
+      <button class="btn" data-wnav="1">${k === 0 ? 'Kom igång' : k === last ? 'Börja laga mat' : k === 1 && !s.geminiKey ? 'Gör senare' : 'Nästa'}</button>
+    </div>
+  </section>`;
+}
+function finishWelcome() {
+  S.settings.onboarded = true; saveSettings(); S.wStep = 0;
+  S.data.textUpdatedAt = now(); saveData();
+  go('home');
+}
+
 function viewSettings() {
   const s = S.settings, p = s.provider;
   const mem = S.data.memory.filter(m => !m.deleted);
@@ -1146,6 +1240,7 @@ ${prefsCards()}
       <div class="field"><label for="gistId">Gist-id för delad kokbok</label><input id="gistId" value="${esc(s.gistId)}" placeholder="Hittas eller skapas automatiskt"></div>
       <div class="row" style="margin-bottom:18px"><button class="ghost" data-savekeys>Spara</button>${s.gistId ? `<button class="ghost" data-syncnow>Synka nu</button>` : ''}</div>
       <div class="field"><label>Tema</label><div class="seg" role="group">${[['auto', 'Som enheten'], ['light', 'Ljust'], ['dark', 'Mörkt']].map(([k, l]) => `<button type="button" data-theme="${k}" aria-pressed="${s.theme === k}">${l}</button>`).join('')}</div></div>
+      <div class="row" style="margin-bottom:12px"><button class="ghost" data-showwelcome>Visa introduktionen igen</button></div>
       <div class="row"><button class="ghost" data-export>Ladda ner säkerhetskopia</button>
         <label class="ghost">Läs in säkerhetskopia<input type="file" accept="application/json" id="importFile" hidden></label></div>
     </details>
@@ -1198,6 +1293,16 @@ $('#stage').addEventListener('click', async e => {
   // Recept
   const chk = t.closest('[data-check]');
   if (chk) { S.checked[chk.dataset.check] = chk.checked; const row = chk.closest('.ing'); row.classList.toggle('checked', chk.checked); updateCount(); saveSession(); return; }
+  const wn = t.closest('[data-wnav]');
+  if (wn) {
+    if ((S.wStep || 0) === 1) { const el = document.getElementById('geminiKey'); if (el) { S.settings.geminiKey = el.value.trim(); saveSettings(); } }
+    const next = (S.wStep || 0) + +wn.dataset.wnav;
+    if (next >= W_STEPS.length) { finishWelcome(); return; }
+    S.wStep = Math.max(0, next); renderStage(); $('#stage').scrollTop = 0; return;
+  }
+  if (t.closest('[data-wskip]')) { finishWelcome(); return; }
+  if (t.closest('[data-wtest]')) { const el = document.getElementById('geminiKey'); S.settings.geminiKey = el.value.trim(); saveSettings(); S.aiStatus = 'Testar…'; renderStage(); testAI().then(r => { S.aiStatus = r; if (S.route.view === 'welcome') renderStage(); }); return; }
+  if (t.closest('[data-showwelcome]')) { S.wStep = 0; go('welcome'); return; }
   const rp = t.closest('[data-rport]');
   if (rp) { const r = S.current.recipe; const n = Math.max(1, Math.min(24, portionsFor(r) + +rp.dataset.rport)); S.portions = { title: r.title, n }; keepScroll(renderStage); saveSession(); return; }
   if (t.closest('[data-resume]')) { const ss = otherSession(); if (ss) { applySession(ss); go('recipe'); renderChat(true); saveSession(); } return; }
@@ -1528,7 +1633,7 @@ function mergeData(remote) {
   const mem = new Map();
   [...(R.memory || []), ...(L.memory || [])].forEach(m => { const e = mem.get(m.id); mem.set(m.id, e ? newer(e, m) : m); });
   L.memory = [...mem.values()].sort((a, b) => (a.at || '').localeCompare(b.at || ''));
-  if ((R.textUpdatedAt || '') > (L.textUpdatedAt || '')) { L.instructions = R.instructions; L.profile = R.profile; if (R.prefs) L.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), R.prefs); L.textUpdatedAt = R.textUpdatedAt; }
+  if ((R.textUpdatedAt || '') > (L.textUpdatedAt || '')) { L.instructions = R.instructions; L.profile = R.profile; if (R.prefs) L.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), L.prefs || {}, R.prefs); L.textUpdatedAt = R.textUpdatedAt; }
   L.deleted = deleted;
   if (R.session && (!L.session || (R.session.updatedAt || '') > (L.session.updatedAt || ''))) L.session = R.session;
   const hm = new Map();
@@ -1569,6 +1674,8 @@ document.addEventListener('keydown', e => {
 readShareLink();
 applyTheme();
 renderStatus();
-go(S.current.recipe && LS.get('fk.lastView', '') === 'recipe' ? 'recipe' : 'home');
+if (HAD_DATA && !S.settings.onboarded) { S.settings.onboarded = true; saveSettings(); }
+if (S.settings.geminiKey && !S.settings.onboarded) { S.settings.onboarded = true; saveSettings(); }
+go(!S.settings.onboarded ? 'welcome' : S.current.recipe && LS.get('fk.lastView', '') === 'recipe' ? 'recipe' : 'home');
 renderChat(true);
 syncNow();

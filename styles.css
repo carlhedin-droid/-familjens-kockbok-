@@ -507,3 +507,24 @@ details.adv[open] summary { margin-bottom: 8px; }
 .resume .muted { font-size: 14.5px; }
 .nav-btn { white-space: nowrap; }
 @media (max-width: 760px) { .sync { display: none; } .nav-btn { font-size: 15px; } }
+
+/* ---------- Introduktion ---------- */
+.app.onboarding .chat-tab, .app.onboarding .status-wrap, .app.onboarding .nav { display: none; }
+.welcome { max-width: 720px; margin: 0 auto; }
+.w-progress { display: flex; gap: 6px; margin: 4px 0 18px; }
+.w-progress span { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+.w-progress span.done { background: var(--pandan); opacity: .5; }
+.w-progress span.on { background: var(--pandan); }
+.w-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 26px 28px; }
+.w-card h1 { font-size: clamp(28px, 4.4vw, 42px); font-weight: 800; margin-bottom: 12px; }
+.w-card .w-lead { font-size: 19px; margin: 0 0 16px; max-width: 60ch; }
+.w-card p { max-width: 62ch; }
+.w-card .hint { font-size: 14.5px; color: var(--muted); }
+.w-card a { color: var(--pandan); font-weight: 700; }
+.w-steps, .w-tips { padding-left: 1.3em; margin: 0 0 14px; }
+.w-steps li, .w-tips li { margin-bottom: 8px; }
+.w-card .field input, .w-card .field textarea { min-height: 46px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg); padding: 10px 12px; width: 100%; }
+.w-card .field textarea { min-height: 90px; resize: vertical; }
+.w-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; }
+.w-nav .btn { min-width: 140px; }
+@media (max-width: 760px) { .w-card { padding: 20px 18px; } }
