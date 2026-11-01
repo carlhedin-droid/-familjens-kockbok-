@@ -1,24 +1,23 @@
-# Familjens kockbok
+# Souschefen
 
-Familjens egen kockcoach som en webbapp. Den fungerar på dator, mobil och surfplatta och bygger på prompten från vår Gemini-gem.
+Familjens souschef och kockbok som webbapp. Fungerar på dator, mobil och platta och använder Google Gemini (gratis).
 
-- **Kocken:** Beskriv vad ni har (eller fota kylen), så får ni förslag med en förklaring till varför de passar er. Välj ett förslag och få hela receptet.
-- **Receptvyn:** Ingredienserna och stegen visas sida vid sida och scrollar var för sig. Ingredienserna går att bocka av. Varje steg har mängderna utskrivna, och när du trycker på en ingrediens i ett steg markeras den i listan. Stegen har timers, och skärmen hålls tänd medan ett recept är öppet.
-- **Fråga kocken:** Fliken i kanten öppnar chatten som en egen panel, så att receptet syns kvar. Kocken vet vilket recept som visas. Be den till exempel att byta en råvara, så uppdateras receptet direkt.
-- **Kockboken:** Spara recept och ge dem betyg. Tryck på "Vi lagade den idag" och skriv anteckningar. Kocken läser kockboken och smakminnet varje gång, så den lär sig vad ni gillar.
+- **Laga mat:** Beskriv vad ni har (eller fota kylen) och få 5–8 förslag med förklaring. Välj ett och få hela receptet.
+- **Receptet:** Ingredienser och steg. Stående skärm: ingredienserna först, sedan stegen. Liggande skärm: steg och ingredienser sida vid sida. Portioner med − och +, timers, och skärmen hålls tänd.
+- **Fråga souschefen:** Chatt bredvid receptet för frågor under matlagningen. Ber du om en ändring uppdateras receptet.
+- **Snabbval (uppe till höger):** Vardag eller helg, tid idag och portioner.
+- **Inställningar:** Hushåll och allergier, tidsramar för vardag och helg, hälsomål, favoritländer och specialutrustning.
+- **Kockboken:** Spara recept, ge betyg och skriv anteckningar. Souschefen läser kockboken och smakminnet varje gång.
 
 ## Kom igång
 
-1. Öppna appen och gå till **Inställningar**.
-2. **Kockens AI:** Klistra in en gratis Gemini-nyckel från https://aistudio.google.com/apikey. Claude går också att välja.
-3. **Dela kockboken** (för att mamma och pappa ska se samma kockbok på alla enheter):
-   - Skapa en GitHub-token med bara behörigheten `gist`.
-   - Klistra in den och tryck på **Skapa delad kockbok**.
-   - Tryck på **Kopiera länk för annan enhet** och öppna länken på mobilen och plattan. Då kopplas de automatiskt.
-4. Lägg till appen på hemskärmen. I Chrome görs det via menyn: Lägg till på startskärmen.
+1. Öppna appen, gå till **Inställningar → Koppling** och klistra in en gratis Gemini-nyckel från https://aistudio.google.com/apikey.
+2. Valfritt: lägg till en GitHub-token (bara behörigheten `gist`) för att dela kockboken mellan enheter.
+3. Tryck **Kopiera länk till annan enhet** och öppna länken på mobilen och plattan.
+4. Lägg appen på hemskärmen via webbläsarens meny.
 
-Nycklarna sparas bara lokalt i webbläsaren och följer aldrig med i koden.
+Nycklarna sparas bara i webbläsaren och följer aldrig med i koden.
 
 ## Teknik
 
-Appen är statisk HTML/CSS/JS utan byggsteg och publiceras med GitHub Pages. Datan sparas i `localStorage` och synkas till en privat Gist (`familjens-kockbok.json`).
+Statisk HTML/CSS/JS utan byggsteg, publicerad med GitHub Pages. Datan sparas i `localStorage` och kan synkas till en privat Gist.

@@ -1,4 +1,4 @@
-/* Familjens kockbok — en statisk webbapp (GitHub Pages).
+/* Souschefen — en statisk webbapp (GitHub Pages).
    AI: Gemini eller Claude via egen API-nyckel. Data: localStorage + valfri synk via privat GitHub Gist. */
 'use strict';
 
@@ -85,7 +85,7 @@ DINA TRE ARBETSLÄGEN
 
 Om viktig information saknas, ställ en motfråga direkt.`;
 const DEFAULT_INSTRUCTIONS = `ROLL & TON
-Du är vår personliga kockcoach och receptgranskare i appen Familjens kockbok.
+Du är vår personliga kockcoach och receptgranskare i appen Souschefen.
 - Rakt på sak, korta meningar, ingen inledning eller utfyllnad.
 - Nivå: utgå från OM FAMILJEN. Är vi vana i köket – förklara inte grunder; fokusera på teknik, timing och smakoptimering.
 - INSTÄLLNINGAR styr portioner, tidsram, utrustning, favoritländer och hälsomål. ALLERGIER OCH ÄTER INTE bryts aldrig – inte heller i tips eller varianter.
@@ -976,7 +976,7 @@ function viewBook() {
   list.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
   const f = (k, l) => `<button class="chip" aria-pressed="${S.bookFilter === k}" data-filter="${k}">${l}</button>`;
   return `<section>
-    <div class="book-head"><h1>Familjens kockbok</h1>
+    <div class="book-head"><h1>Kockboken</h1>
       <input class="search" id="bookSearch" type="search" placeholder="Sök rätt, råvara eller anteckning" value="${esc(S.bookQuery)}" aria-label="Sök i kockboken"></div>
     <div class="filters">${f('alla', 'Alla')}${f('favoriter', 'Favoriter')}${f('vardag', 'Vardag')}${f('helg', 'Helg')}</div>
     ${S.data.recipes.length === 0
@@ -1060,7 +1060,7 @@ ${prefsCards()}
         <span class="hint">${p === 'claude' ? 'Från <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.' : 'Hämtas på <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.'}${ai ? ` <strong class="status-line">${esc(ai)}</strong>` : ''}</span></div>
       <div class="field"><label for="ghToken">GitHub-token för att dela kockboken <span class="muted">(valfritt)</span></label>
         <input id="ghToken" type="password" autocomplete="off" value="${esc(s.ghToken)}" placeholder="ghp_…">
-        <span class="hint">Behövs bara om fler enheter ska se samma kockbok. <a href="https://github.com/settings/tokens/new?scopes=gist&description=Familjens%20kockbok" target="_blank" rel="noopener">Skapa token</a> (bara behörigheten "gist"). <strong class="status-line">${esc(sync)}</strong></span></div>
+        <span class="hint">Behövs bara om fler enheter ska se samma kockbok. <a href="https://github.com/settings/tokens/new?scopes=gist&description=Souschefen" target="_blank" rel="noopener">Skapa token</a> (bara behörigheten "gist"). <strong class="status-line">${esc(sync)}</strong></span></div>
       <div class="row"><button class="btn" data-connect>Spara och testa</button>
         ${s[keyField] ? `<button class="ghost" data-sharelink>Kopiera länk till annan enhet</button>` : ''}</div>
       ${s[keyField] ? `<p class="hint muted" style="margin:10px 0 0;font-size:14px">Öppna länken på mobilen eller plattan så kopplas den automatiskt. Länken innehåller nycklarna – skicka den bara till er själva.</p>` : ''}
@@ -1255,7 +1255,7 @@ function saveRecipe() {
   } else {
     const rec = { ...stripRecipe(r), id: uid(), savedAt: now(), updatedAt: now(), notes: '', rating: 0, cooked: [] };
     S.data.recipes.push(rec); S.current.recipeSavedId = rec.id;
-    toast('Sparad i familjens kockbok');
+    toast('Sparad i kockboken');
   }
   S.current.dirty = false; saveData(); saveCurrent(); renderStage();
 }
@@ -1395,7 +1395,7 @@ async function connectAll() {
 async function createGist() {
   if (!S.settings.ghToken) { toast('Lägg in en GitHub-token först'); return; }
   setSync('Skapar…');
-  const res = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: 'Familjens kockbok', public: false, files: { [DATA_FILE]: { content: JSON.stringify(S.data, null, 1) } } }) });
+  const res = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: 'Souschefen – kockbok', public: false, files: { [DATA_FILE]: { content: JSON.stringify(S.data, null, 1) } } }) });
   const j = await res.json().catch(() => ({}));
   if (!res.ok) { setSync('Synk misslyckades', j.message || ''); toast('Kunde inte skapa: ' + (j.message || res.status)); return; }
   S.settings.gistId = j.id; saveSettings(); setSync('Synkad'); toast('Delad kockbok skapad'); renderStage();
@@ -1461,7 +1461,7 @@ function readShareLink() {
   try {
     const p = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
     Object.keys(p).forEach(k => { if (p[k]) S.settings[k] = p[k]; });
-    saveSettings(); toast('Enheten är kopplad till familjens kockbok');
+    saveSettings(); toast('Enheten är kopplad till Souschefen');
   } catch { toast('Kopplingslänken gick inte att läsa'); }
   history.replaceState(null, '', location.pathname);
 }

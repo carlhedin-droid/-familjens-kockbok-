@@ -1,6 +1,6 @@
 {
-  "name": "Familjens kockbok",
-  "short_name": "Kockboken",
+  "name": "Souschefen",
+  "short_name": "Souschefen",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
