@@ -69,8 +69,8 @@ Om viktig information saknas (t.ex. allergier), ställ en motfråga direkt.`;
 const DEFAULT_INSTRUCTIONS = `ROLL & TONALITET
 Du är vår personliga kockcoach och receptgranskare.
 Stil: Rakt på sak. Ingen "fluffig" inledning. Korta meningar.
-Kompetens: Vi är foodies med hög kunskapsnivå (särskilt inom asiatisk matlagning efter 5 år i Malaysia/Singapore). Förklara inte grunder – fokusera på teknik och smakoptimering.
-Portioner, allergier, tidsram, utrustning, kök och hälsomål styrs av INSTÄLLNINGAR nedan – följ dem. Allergier och "äter inte" får aldrig brytas.
+Kompetens: Anpassa nivån efter OM FAMILJEN. Är vi vana i köket – förklara inte grunder, fokusera på teknik och smakoptimering.
+Portioner, allergier, tidsram, utrustning, favoritländer och hälsomål styrs av INSTÄLLNINGAR nedan – följ dem. Allergier och "äter inte" får aldrig brytas.
 
 DAG & TID
 Anta att maten lagas idag om inget annat sägs. Tidsramen i INSTÄLLNINGAR är total tid inklusive förberedelser – håll dig inom den.
@@ -88,12 +88,24 @@ Om viktig information saknas, ställ en motfråga direkt.`;
 const DEFAULT_PROFILE_V2 = `Två vuxna och två tonåringar (13–15 år). Vi bor på Ekerö och handlar i vanliga svenska matbutiker.
 Allergier: inga kända.`;
 
-const DEFAULT_PROFILE = `Två vuxna och två tonåringar (13–15 år). Vi bor på Ekerö och handlar i vanliga svenska matbutiker.`;
+const PROFILE_V3 = `Två vuxna och två tonåringar (13–15 år). Vi bor på Ekerö och handlar i vanliga svenska matbutiker.`;
+const FOODIE_LINE = 'Vi är foodies med hög kunskapsnivå, särskilt inom asiatisk matlagning efter 5 år i Malaysia/Singapore.';
+const DEFAULT_PROFILE = `Två vuxna och två tonåringar (13–15 år). ${FOODIE_LINE}\nVi bor på Ekerö och handlar i vanliga svenska matbutiker.`;
 
 const OPT = {
   eaters: ['Tonåringar', 'Småbarn', 'Tränande / idrottare', 'Kräsna ätare', 'Storätare', 'Gäster / vänner', 'Bara vuxna'],
-  equipment: ['Matberedare', 'Airfryer / fritös', 'Slow cooker', 'Bakstål', 'Sous vide', 'Köttkvarn', 'Vakuummaskin', 'Grillpanna', 'Kolgrill', 'Gasolgrill', 'Wokpanna', 'Stor soppkastrull', 'Riskokare', 'Mixer', 'Köksassistent', 'Pizzaugn', 'Rökskåp', 'Mandolin', 'Ångkokare'],
-  cuisines: ['Svenska', 'Nordiska', 'Franska', 'Italienska', 'Spanska', 'Grekiska', 'Libanesiska', 'Turkiska', 'Indiska', 'Thailändska', 'Malaysiska', 'Singaporianska', 'Vietnamesiska', 'Kinesiska', 'Koreanska', 'Japanska', 'Amerikanska', 'Mexikanska', 'Sydamerikanska', 'Vegetariskt med karaktär'],
+  equipment: [
+    ['Grill och rök', ['Kolgrill', 'Gasolgrill', 'Kamado', 'Rökgrill / rökskåp', 'Pizzaugn', 'Grillpanna']],
+    ['Precision', ['Sous vide', 'Vakuummaskin', 'Digital stektermometer']],
+    ['Maskiner', ['Matberedare', 'Köksassistent', 'Kraftfull mixer', 'Köttkvarn', 'Pastamaskin', 'Mandolin']],
+    ['Kokning och stekning', ['Airfryer', 'Fritös', 'Slow cooker', 'Tryckkokare', 'Riskokare', 'Ångugn', 'Wokpanna', 'Gjutjärnsgryta', 'Bakstål / pizzasten']],
+  ],
+  cuisines: [
+    ['Europa', [['SE', 'Sverige'], ['FR', 'Frankrike'], ['IT', 'Italien'], ['ES', 'Spanien'], ['GR', 'Grekland'], ['GB', 'Storbritannien']]],
+    ['Mellanöstern och Afrika', [['LB', 'Libanon'], ['TR', 'Turkiet'], ['MA', 'Marocko']]],
+    ['Asien', [['IN', 'Indien'], ['TH', 'Thailand'], ['MY', 'Malaysia'], ['SG', 'Singapore'], ['ID', 'Indonesien'], ['VN', 'Vietnam'], ['CN', 'Kina'], ['KR', 'Korea'], ['JP', 'Japan']]],
+    ['Amerika', [['US', 'USA'], ['MX', 'Mexiko'], ['PE', 'Peru'], ['AR', 'Argentina'], ['BR', 'Brasilien']]],
+  ],
   profiles: [
     ['vardag', 'Vardagspusslaren', 'Tid och smidighet först. Smarta maskiner, familjevänligt, utan stress.'],
     ['pryl', 'Entusiasten & prylnörden', 'Teknik och perfektion. Avancerad utrustning för restaurangklass hemma.'],
@@ -118,13 +130,17 @@ const OPT = {
 const TIMES = [['20', '20 min'], ['30', '30 min'], ['45', '45 min'], ['60', '1 h'], ['120', '2 h'], ['lang', 'Hela eftermiddagen']];
 const timeLabel = k => (TIMES.find(x => x[0] === k) || [, k])[1];
 const DEFAULT_HEALTH = 'Volym + spets: mättande grönt som bas och en smakspets ovanpå. Högt protein. Periodisk fasta och styrketräning, mål viktminskning.';
+const STANDARD_KITCHEN = 'spis, ugn, mikro, stekpannor, kastruller (även stor gryta), ugnsformar, plåtar, stavmixer, elvisp, våg och vanliga knivar';
+const CUISINE_MAP = { Svenska: ['Sverige'], Nordiska: ['Sverige'], Franska: ['Frankrike'], Italienska: ['Italien'], Spanska: ['Spanien'], Grekiska: ['Grekland'], Libanesiska: ['Libanon'], Turkiska: ['Turkiet'], Indiska: ['Indien'], Thailändska: ['Thailand'], Malaysiska: ['Malaysia'], Singaporianska: ['Singapore'], Vietnamesiska: ['Vietnam'], Kinesiska: ['Kina'], Koreanska: ['Korea'], Japanska: ['Japan'], Amerikanska: ['USA'], Mexikanska: ['Mexiko'], Sydamerikanska: ['Peru', 'Argentina'] };
+const EQUIP_MAP = { 'Airfryer / fritös': 'Fritös', 'Bakstål': 'Bakstål / pizzasten', 'Rökskåp': 'Rökgrill / rökskåp', 'Mixer': 'Kraftfull mixer', 'Ångkokare': 'Ångugn', 'Stor soppkastrull': null };
 const DEFAULT_PREFS = {
   portions: 4, bigEaters: true,
   allergies: 'Inga kända',
   weekdayTime: '30', weekendTime: '120', weekendGear: true,
   healthWho: 'Pappa', healthNote: DEFAULT_HEALTH, healthyAlt: true,
-  cuisines: ['Svenska', 'Franska', 'Italienska', 'Amerikanska', 'Mexikanska', 'Sydamerikanska', 'Malaysiska', 'Singaporianska', 'Japanska', 'Vegetariskt med karaktär'],
-  equipment: ['Matberedare', 'Airfryer / fritös', 'Slow cooker', 'Bakstål', 'Sous vide', 'Köttkvarn', 'Vakuummaskin', 'Grillpanna', 'Kolgrill', 'Wokpanna', 'Stor soppkastrull'],
+  cuisines: ['Sverige', 'Frankrike', 'Italien', 'USA', 'Mexiko', 'Peru', 'Malaysia', 'Singapore', 'Japan'],
+  equipment: ['Matberedare', 'Fritös', 'Slow cooker', 'Bakstål / pizzasten', 'Sous vide', 'Köttkvarn', 'Vakuummaskin', 'Grillpanna', 'Kolgrill', 'Wokpanna'],
+  migratedV4: true,
   customEquipment: [],
 };
 
@@ -214,10 +230,30 @@ if (!S.settings.migratedGemini) {
 if (!S.settings.migrated36) { if (!S.settings.geminiModel || /3\.8|flash-latest/.test(S.settings.geminiModel)) S.settings.geminiModel = DEFAULT_MODELS.gemini; S.settings.migrated36 = true; saveSettings(); }
 // Inställningar flyttade från prompten till klickbara val
 function migrateData() {
+  const P0 = S.data.prefs;
+  if (P0 && !P0.migratedV4) {
+    // Kök → länder, utrustning → bara utöver standard
+    const allC = OPT.cuisines.flatMap(([, l]) => l.map(x => x[1]));
+    if (Array.isArray(P0.cuisines)) P0.cuisines = [...new Set(P0.cuisines.flatMap(c => CUISINE_MAP[c] || (allC.includes(c) ? [c] : [])))];
+    const allE = OPT.equipment.flatMap(([, l]) => l);
+    if (Array.isArray(P0.equipment)) {
+      const mapped = P0.equipment.map(e => e in EQUIP_MAP ? EQUIP_MAP[e] : e).filter(Boolean);
+      P0.equipment = [...new Set(mapped.filter(e => allE.includes(e)))];
+      P0.customEquipment = [...new Set([...(P0.customEquipment || []), ...mapped.filter(e => !allE.includes(e))])];
+    }
+    P0.migratedV4 = true;
+  }
+  if (P0 && Array.isArray(P0.customEquipment)) {
+    const allE = OPT.equipment.flatMap(([, l]) => l);
+    const known = P0.customEquipment.filter(e => allE.includes(e));
+    if (known.length) { P0.equipment = [...new Set([...(P0.equipment || []), ...known])]; P0.customEquipment = P0.customEquipment.filter(e => !allE.includes(e)); }
+  }
   S.data.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), S.data.prefs || {});
   if (S.data.instructions === LEGACY_INSTRUCTIONS || S.data.instructions === INSTRUCTIONS_V2) S.data.instructions = DEFAULT_INSTRUCTIONS;
   if (/^Periodisk fasta och styrketräning\. Mål: viktminskning/.test(S.data.prefs.healthNote || '')) S.data.prefs.healthNote = DEFAULT_HEALTH;
-  if (S.data.profile === DEFAULT_PROFILE_V2) S.data.profile = DEFAULT_PROFILE;
+  if (S.data.profile === DEFAULT_PROFILE_V2 || S.data.profile === PROFILE_V3) S.data.profile = DEFAULT_PROFILE;
+  else if (S.data.profile && !/Malaysia|foodie/i.test(S.data.profile) && !S.data.prefs.foodieAdded) { S.data.profile = S.data.profile.trim() + '\n' + FOODIE_LINE; }
+  S.data.prefs.foodieAdded = true;
   if (S.data.profile === LEGACY_PROFILE) S.data.profile = DEFAULT_PROFILE;
 }
 migrateData();
@@ -353,7 +389,7 @@ function buildSystem() {
     : (S.route.view === 'suggestions' && S.current.suggestions
       ? 'Förslagslistan: ' + S.current.suggestions.map((s, i) => `${i + 1}. ${s.name}`).join('; ')
       : 'Inget recept visas just nu.');
-  return `${S.data.instructions}
+  return `${DEFAULT_INSTRUCTIONS}
 
 ${prefsText(d)}
 
@@ -385,8 +421,9 @@ function prefsText(d) {
 - ALLERGIER OCH ÄTER INTE (får aldrig brytas): ${P.allergies || 'inga kända'}
 - Hälsomål${P.healthWho ? ` (gäller ${P.healthWho})` : ''}: ${P.healthNote || 'inga särskilda'}
 - Lättare alternativ: ${P.healthyAlt ? `ja – fyll alltid "health" med hur rätten anpassas för ${P.healthWho || 'den'} som vill äta lättare` : 'bara om vi ber om det'}
-- Favoritkök: ${P.cuisines.join(', ') || 'alla'}
-- Utrustning vi har: ${equip.join(', ') || 'vanligt hemmakök'}`;
+- Favoritländer (sprid förslagen över dessa kök): ${P.cuisines.join(', ') || 'alla'}
+- Standardutrustning (finns alltid): ${STANDARD_KITCHEN}
+- Specialutrustning vi har: ${equip.join(', ') || 'ingen utöver standard'}`;
 }
 function stripRecipe(r) {
   const { id, savedAt, updatedAt, notes, rating, cooked, ...rest } = r;
@@ -947,15 +984,17 @@ function prefsCards() {
     </div>
 
     <div class="card">
-      <h2>Favoritkök</h2>
-      <p>Förslagen sprids över de kök ni väljer.</p>
-      <div class="chips">${OPT.cuisines.map(v => chip('cuisines', v)).join('')}</div>
+      <h2>Favoritländer</h2>
+      <p>Förslagen sprids över de länders kök ni väljer.</p>
+      ${OPT.cuisines.map(([reg, list]) => `<div class="opt-group"><h3>${esc(reg)}</h3><div class="chips">${list.map(([cc, name]) => `<button type="button" class="chip opt flagchip" data-ptoggle="cuisines" data-val="${esc(name)}" aria-pressed="${P.cuisines.includes(name)}">${flags({ countries: [cc] })}${esc(name)}</button>`).join('')}</div></div>`).join('')}
     </div>
 
     <div class="card">
-      <h2>Köksutrustning</h2>
-      <div class="chips">${OPT.equipment.map(v => chip('equipment', v)).join('')}${P.customEquipment.map(v => `<button type="button" class="chip opt" data-premove="${esc(v)}" aria-pressed="true" title="Tryck för att ta bort">${esc(v)} ×</button>`).join('')}</div>
-      <div class="row" style="margin-top:12px"><input id="equipNew" class="search" placeholder="Lägg till egen, t.ex. Kamado" style="max-width:none"><button class="ghost" data-equipadd>Lägg till</button></div>
+      <h2>Specialutrustning</h2>
+      <p>Bara det ni har utöver ett vanligt kök. Spis, ugn, mikro, stekpannor, kastruller, ugnsformar, stavmixer, elvisp och våg räknas alltid med.</p>
+      ${OPT.equipment.map(([grp, list]) => `<div class="opt-group"><h3>${esc(grp)}</h3><div class="chips">${list.map(v => chip('equipment', v)).join('')}</div></div>`).join('')}
+      <div class="chips">${P.customEquipment.map(v => `<button type="button" class="chip opt" data-premove="${esc(v)}" aria-pressed="true" title="Tryck för att ta bort">${esc(v)} ×</button>`).join('')}</div>
+      <div class="row" style="margin-top:12px"><input id="equipNew" class="search" placeholder="Lägg till egen, t.ex. Plancha" style="max-width:none"><button class="ghost" data-equipadd>Lägg till</button></div>
     </div>`;
 }
 
@@ -999,10 +1038,6 @@ ${prefsCards()}
         <span class="hint">Standard: ${DEFAULT_MODELS[p]}.${p === 'gemini' ? ' Är modellen upptagen provar appen andra gratismodeller automatiskt.' : ''}</span></div>
       <div class="field"><label for="gistId">Gist-id för delad kockbok</label><input id="gistId" value="${esc(s.gistId)}" placeholder="Hittas eller skapas automatiskt"></div>
       <div class="row" style="margin-bottom:18px"><button class="ghost" data-savekeys>Spara</button>${s.gistId ? `<button class="ghost" data-syncnow>Synka nu</button>` : ''}</div>
-      <div class="field"><label for="instructions">Kockens grundinstruktioner</label>
-        <textarea id="instructions" class="tall">${esc(S.data.instructions)}</textarea>
-        <span class="hint">Hur kocken arbetar. Familj, utrustning och mål ovan läggs till automatiskt, liksom appens svarsformat.</span></div>
-      <div class="row" style="margin-bottom:18px"><button class="ghost" data-saveinstr>Spara instruktioner</button><button class="ghost" data-resetinstr>Återställ standard</button></div>
       <div class="field"><label>Tema</label><div class="seg" role="group">${[['auto', 'Som enheten'], ['light', 'Ljust'], ['dark', 'Mörkt']].map(([k, l]) => `<button type="button" data-theme="${k}" aria-pressed="${s.theme === k}">${l}</button>`).join('')}</div></div>
       <div class="row"><button class="ghost" data-export>Ladda ner säkerhetskopia</button>
         <label class="ghost">Läs in säkerhetskopia<input type="file" accept="application/json" id="importFile" hidden></label></div>

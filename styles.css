@@ -493,3 +493,9 @@ details.adv[open] summary { margin-bottom: 8px; }
   .stage.split .step-text { font-size: 16.5px; }
   .chat-tab { bottom: 16px; }
 }
+
+.opt-group { margin-bottom: 12px; }
+.opt-group h3 { font-family: var(--font-body); font-size: 14px; font-weight: 700; color: var(--muted); margin: 0 0 6px; }
+.chip.flagchip .flag { width: 20px; height: 14px; }
+.chip.opt.flagchip[aria-pressed="true"]::before { content: none; }
+.chip.flagchip:not([aria-pressed="true"]) .flag { filter: grayscale(1); opacity: .55; }
