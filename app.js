@@ -108,7 +108,8 @@ LÄGE 2 – RECEPT (vald rätt, länk eller inklistrat recept, eller ändring)
 - Varje steg: mängder utskrivna, värme (svag/medel/hög eller °C), tid och klar-tecken (färg, konsistens, innertemperatur för kött, fågel och fisk).
 - Flavor ROI: fett och kalorier som ger stor smakutdelning är ok. Smak går före asketism – maten får aldrig bli tråkig.
 - Hälsa: följ hälsomålet. Uppskatta protein (g) och energi (kcal) per portion och ge konkreta byten för den som vill äta lättare.
-- Länk eller inklistrat recept: behåll rättens själ, anpassa till oss och säg i reply vad du ändrat.
+- RENSKRIVNING (länk eller inklistrat recept): återge originalet troget – samma råvaror, mängder, tekniker och ordning. Ändra bara det som gör receptet lättare att följa: metriska mått, skalning till våra portioner, mängder utskrivna i stegen, tydligare och kortare steg, värme och klar-tecken där originalet är otydligt. Egna förbättringar och anpassningar efter våra inställningar läggs i "tips" eller "health" – inte i själva receptet. Undantag: krockar något med ALLERGIER OCH ÄTER INTE, byt ut det och säg det i reply. Sätt "source" till länken. Säg i reply kort varifrån receptet kommer och vad du justerat.
+- Kunde du inte läsa länken (sidan saknas, kräver inloggning eller innehåller inget recept): hitta INTE på ett recept. Säg det i reply, sätt recipe till null och be oss klistra in receptets text.
 - Ändring: skicka hela receptet, behåll ingrediens-id och portioner om inget annat sägs.
 
 LÄGE 3 – INSPIRATION (råvaror, foto eller önskemål)
@@ -203,7 +204,7 @@ const RESPONSE_SCHEMA = {
       why: S_STR, keyIngredients: S_ARR, equipment: S_STRN, healthier: { type: 'BOOLEAN' }, vegetarian: { type: 'BOOLEAN' } },
       required: ['name', 'origin', 'tag', 'time', 'why'] } },
     recipe: { type: 'OBJECT', nullable: true, properties: {
-      title: S_STR, origin: S_STR, countries: S_ARR, tag: { type: 'STRING', enum: ['VARDAG', 'HELG'] }, time: S_STR, servings: { type: 'INTEGER' }, intro: S_STR,
+      title: S_STR, origin: S_STR, countries: S_ARR, source: S_STRN, tag: { type: 'STRING', enum: ['VARDAG', 'HELG'] }, time: S_STR, servings: { type: 'INTEGER' }, intro: S_STR,
       ingredients: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: S_STR, amount: S_STR, name: S_STR, note: S_STRN, group: S_STRN }, required: ['id', 'amount', 'name'] } },
       steps: { type: 'ARRAY', items: { type: 'OBJECT', properties: { text: S_STR, uses: S_ARR, minutes: { type: 'INTEGER', nullable: true } }, required: ['text'] } },
       health: { type: 'OBJECT', nullable: true, properties: { summary: S_STR, tips: S_ARR } },
@@ -221,7 +222,7 @@ Du svarar inuti en app. Svara ALLTID med exakt ett JSON-objekt – ingen text f�
   "reply": "Text som visas i chatten. LÄGE 1: hela svaret. Nytt recept eller förslag: högst 1–2 meningar, upprepa INTE innehållet. Ändrat recept: en mening om vad som ändrats. Enkel markdown (**fet**, punktlistor med '- ') är ok.",
   "suggestions": null | [ { "name": "", "origin": "kök/land", "countries": ["MY"], "tag": "VARDAG" | "HELG", "time": "t.ex. 35 min", "difficulty": "Lätt" | "Medel" | "Avancerad", "why": "1–2 meningar om varför den passar oss", "keyIngredients": [""], "equipment": "" | null, "healthier": true|false, "vegetarian": true|false } ],
   "recipe": null | {
-    "title": "", "origin": "", "countries": ["MY"], "tag": "VARDAG" | "HELG", "time": "", "servings": 4, "intro": "1–2 meningar",
+    "title": "", "origin": "", "countries": ["MY"], "source": "länk till originalet" | null, "tag": "VARDAG" | "HELG", "time": "", "servings": 4, "intro": "1–2 meningar",
     "ingredients": [ { "id": "i1", "amount": "300 g", "name": "kycklinglårfilé", "note": "i bitar" | null, "group": "Marinad" | null } ],
     "steps": [ { "text": "Bryn 300 g kycklinglårfilé ...", "uses": ["i1"], "minutes": 8 | null } ],
     "health": { "summary": "≈45 g protein och 650 kcal per portion. …", "tips": ["konkret byte för den som vill äta lättare"] },
@@ -583,13 +584,14 @@ async function callModel(onProgress = () => {}) {
   if (!key) throw new Error('NOKEY');
   const lastUser = [...msgs].reverse().find(m => m.role === 'user');
   const hasLink = /https?:\/\/\S+/.test(lastUser?.text || '');
-  let schema = RESPONSE_SCHEMA;
+  let schema = RESPONSE_SCHEMA, useTool = hasLink;
+  S.lastUrlFail = false;
   const mkBody = thinking => JSON.stringify({
-    ...(hasLink ? { tools: [{ url_context: {} }] } : {}),
+    ...(useTool ? { tools: [{ url_context: {} }] } : {}),
     systemInstruction: { parts: [{ text: sys }] },
     contents: mergeRoles(msgs).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [
       ...(m.image ? [{ inlineData: { mimeType: m.image.mime, data: m.image.data } }] : []), { text: m.text } ] })),
-    generationConfig: { ...(hasLink ? {} : { responseMimeType: 'application/json', responseSchema: schema }), temperature: 0.8, ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}) },
+    generationConfig: { ...(useTool ? {} : { responseMimeType: 'application/json', responseSchema: schema }), temperature: 0.8, ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}) },
   });
   // Prova vald modell först, sedan reservmodeller om den inte finns/inte ingår i gratisnivån
   const models = [...new Set([S.settings.geminiModel || DEFAULT_MODELS.gemini, ...GEMINI_FALLBACKS])];
@@ -606,7 +608,7 @@ async function callModel(onProgress = () => {}) {
       if (res.ok) {
         if (model !== S.settings.geminiModel && !/överbelastad|kvot/.test(lastErr)) { S.settings.geminiModel = model; saveSettings(); }
         const reader = res.body.getReader(); const dec = new TextDecoder();
-        let buf = '', txt = '', finish = '';
+        let buf = '', txt = '', finish = '', urlMeta = null;
         for (;;) {
           const { value, done } = await reader.read();
           if (done) break;
@@ -620,10 +622,14 @@ async function callModel(onProgress = () => {}) {
               const c = j.candidates?.[0];
               (c?.content?.parts || []).forEach(p => { if (!p.thought && p.text) txt += p.text; });
               if (c?.finishReason) finish = c.finishReason;
+              const um = c?.urlContextMetadata || c?.url_context_metadata;
+              if (um) urlMeta = um.urlMetadata || um.url_metadata || urlMeta;
               onProgress(txt);
             } catch { /* ofullständig rad */ }
           }
         }
+        if (useTool && Array.isArray(urlMeta) && urlMeta.length && !urlMeta.some(u => /SUCCESS/i.test(u.urlRetrievalStatus || u.url_retrieval_status || ''))) S.lastUrlFail = true;
+        if (hasLink && !useTool) S.lastUrlFail = true;
         if (!txt) throw new Error('Tomt svar från Gemini (' + (finish || 'okänd orsak') + ')');
         return txt;
       }
@@ -633,6 +639,7 @@ async function callModel(onProgress = () => {}) {
       console.warn('Gemini', model, res.status, status, msg);
       if (res.status === 400 && thinking && /think/i.test(msg)) { thinking = null; continue; }  // modellen godtar inte nivån
       if (res.status === 400 && schema && /schema|response_schema|responseSchema/i.test(msg)) { schema = undefined; continue; }
+      if (res.status === 400 && useTool && /url_context|urlContext|tool/i.test(msg)) { useTool = false; continue; }
       lastErr = `${model}: ${msg}`;
       // Överbelastad (503/500) eller kvot slut (429): prova nästa modell direkt
       if (res.status === 503 || res.status === 500 || res.status === 429 || /UNAVAILABLE|high demand|overloaded|RESOURCE_EXHAUSTED/i.test(msg + status)) {
@@ -688,6 +695,7 @@ function normalizeRecipe(r) {
   r.steps = r.steps.map(s => typeof s === 'string' ? { text: s, uses: [], minutes: null } :
     { text: s.text || '', uses: Array.isArray(s.uses) ? s.uses.map(String) : [], minutes: Number(s.minutes) > 0 ? Number(s.minutes) : null });
   r.servings = r.servings || 4;
+  if (r.source && !/^https?:\/\//.test(r.source)) r.source = null;
   r.health = r.health || null; r.tips = Array.isArray(r.tips) ? r.tips : [];
   return r;
 }
@@ -698,7 +706,7 @@ function partialReply(acc) {
   try { return JSON.parse('"' + m[1].replace(/\\$/, '') + '"'); } catch { return m[1].replace(/\\n/g, '\n'); }
 }
 function showProgress(acc, override) {
-  const what = override ? override : /"recipe"\s*:\s*\{/.test(acc) ? 'Souschefen skriver receptet…'
+  const what = override ? override : S.readingHost && !acc ? `Läser receptet från ${S.readingHost}…` : /"recipe"\s*:\s*\{/.test(acc) ? 'Souschefen skriver receptet…'
     : /"suggestions"\s*:\s*\[/.test(acc) ? `Souschefen plockar fram förslag… (${(acc.match(/"name"\s*:/g) || []).length} hittills)`
     : 'Souschefen tänker…';
   const st = document.getElementById('stageStatus'); if (st) st.textContent = what;
@@ -711,6 +719,7 @@ async function send(text, image, opts = {}) {
   text = (text || '').trim();
   if ((!text && !image) || S.busy) return;
   const flow = !!opts.flow;
+  S.readingHost = (() => { const l = (text.match(/https?:\/\/[^\s]+/) || [])[0]; try { return l ? new URL(l).hostname.replace(/^www\./, '') : ''; } catch { return ''; } })();
   const userMsg = { role: 'user', text: text || 'Vad kan jag laga av det här?', image, at: now(), hidden: flow };
   S.chat.push(userMsg);
   S.busy = flow ? 'flow' : 'chat'; saveChat(); renderChat(true);
@@ -719,8 +728,16 @@ async function send(text, image, opts = {}) {
     const raw = await callModel(showProgress);
     const o = parseReply(raw);
     const msg = { role: 'assistant', text: o.reply || '', at: now() };
-    const recipe = normalizeRecipe(o.recipe);
-    const sugg = Array.isArray(o.suggestions) && o.suggestions.length ? o.suggestions : null;
+    const linkInMsg = (text.match(/https?:\/\/[^\s]+/) || [])[0];
+    let recipe = normalizeRecipe(o.recipe);
+    let sugg = Array.isArray(o.suggestions) && o.suggestions.length ? o.suggestions : null;
+    if (linkInMsg && S.lastUrlFail) {
+      // Sidan gick inte att läsa – visa aldrig ett påhittat recept
+      recipe = null; sugg = null;
+      let host = linkInMsg; try { host = new URL(linkInMsg).hostname.replace(/^www\./, ''); } catch { }
+      msg.text = `Jag kunde inte läsa receptet på ${host}. Sidan kan kräva inloggning eller blockera uppläsning. Kopiera receptets text och klistra in den här, så renskriver jag det.`;
+    }
+    if (recipe && linkInMsg && !recipe.source) recipe.source = linkInMsg;
     if (recipe) {
       const keepId = S.route.view === 'recipe' ? S.current.recipeSavedId : null;
       const sameDish = S.route.view === 'recipe' && S.current.recipe;
@@ -885,7 +902,7 @@ function viewHome() {
     <h1>Vad har ni, och vad är ni sugna på?</h1>
     <p class="day-line">${hint}</p>
     <form class="asker" id="homeAsk">
-      <textarea id="homeInput" placeholder="T.ex. Vi har kycklinglår, en halv vitkål, kokosmjölk och lime. Något starkt och asiatiskt." aria-label="Beskriv vad ni har och vad ni vill ha"></textarea>
+      <textarea id="homeInput" placeholder="T.ex. Vi har kycklinglår, vitkål och kokosmjölk – något starkt. Eller klistra in en receptlänk." aria-label="Beskriv vad ni har och vad ni vill ha"></textarea>
       <div class="attach-preview" id="homeAttach" ${S.homeAttach ? '' : 'hidden'}>${S.homeAttach ? `<img src="${S.homeAttach.url}" alt=""><span>Foto bifogat</span>` : ''}</div>
       <div class="asker-row">
         <label class="ghost" title="Fota kylen eller skafferiet">
@@ -970,6 +987,7 @@ function viewRecipe() {
     ${r.origin || r.countries ? `<div class="r-origin origin">${flags(r)}<span>${esc(r.origin || '')}</span></div>` : ''}
     <h1>${esc(r.title)}</h1>
     <div class="r-meta">
+      ${r.source ? `<a class="r-source" href="${esc(r.source)}" target="_blank" rel="noopener">Källa: ${esc((() => { try { return new URL(r.source).hostname.replace(/^www\./, ''); } catch { return 'länk'; } })())}</a>` : ''}
       ${r.tag ? `<span class="tag ${isHelg ? 'helg' : 'vardag'}">${isHelg ? 'Helg' : 'Vardag'}</span>` : ''}
       ${r.time ? `<span>${esc(r.time)}</span>` : ''}
       ${saved?.rating ? `<span style="color:var(--kunyit)">${'★'.repeat(saved.rating)}</span>` : ''}
@@ -1255,7 +1273,11 @@ function bindStage() {
     homeAsk.onsubmit = e => {
       e.preventDefault();
       const v = $('#homeInput').value, img = S.homeAttach; S.homeAttach = null;
-      send(v || (img ? 'Det här har vi hemma. Ge förslag.' : ''), img, { flow: true });
+      let q = (v || '').trim();
+      const link = (q.match(/https?:\/\/[^\s]+/) || [])[0];
+      if (link) q = `Renskriv receptet från länken: ${link}` + (q.replace(link, '').trim() ? `\nÖnskemål: ${q.replace(link, '').trim()}` : '');
+      else if (q.length > 250 && q.split('\n').length > 4) q = `Renskriv det här receptet:\n${q}`;
+      send(q || (img ? 'Det här har vi hemma. Ge förslag.' : ''), img, { flow: true });
     };
     $('#homeInput').onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) homeAsk.requestSubmit(); };
     $('#homeFile').onchange = async e => {
