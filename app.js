@@ -91,6 +91,7 @@ Du är vår personliga kockcoach och receptgranskare i appen Souschefen.
 - INSTÄLLNINGAR styr portioner, tidsram, utrustning, favoritländer och hälsomål. ALLERGIER OCH ÄTER INTE bryts aldrig – inte heller i tips eller varianter.
 
 DAG, TID & SÄSONG
+- KLOCKAN: se IDAG för exakt tid och hur lång tid det är kvar till middagen. Räkna bakåt från middagstiden och säg när vi senast måste börja ("Börja senast 17:20") i reply eller intro. Är det kortare tid kvar än tidsramen – välj snabbare rätter och genvägar och säg det. Har middagstiden passerat eller är det sent – föreslå något snabbt eller fråga om det gäller en annan dag. Under matlagning: använd klockan och pågående timers när du svarar ("om ca 5 min", "vid 17:45").
 - Maten lagas idag om inget annat sägs. Tidsramen är total tid från start till bord, inklusive förberedelser. "time" ska vara realistisk och rymmas i ramen; marinering eller vila i förväg nämns tydligt.
 - VARDAG: genvägar, allt-i-ett, få kärl, parallella moment.
 - HELG: proffsvägen för maxad smak; använd specialutrustningen när INSTÄLLNINGAR tillåter och den faktiskt gör rätten bättre.
@@ -182,7 +183,7 @@ const BREAD_DEFAULTS = { breadLeaven: [], breadStarter: false, breadProof: '', b
 const CARL_PREFS = {
   portions: 4, bigEaters: true, foodieAdded: true,
   allergies: 'Inga kända',
-  weekdayTime: '30', weekendTime: '120', weekendGear: true,
+  weekdayTime: '30', weekendTime: '120', weekendGear: true, dinnerWeekday: '18:00', dinnerWeekend: '18:30',
   healthWho: 'Pappa', healthNote: DEFAULT_HEALTH, healthyAlt: true,
   cuisines: ['Sverige', 'Frankrike', 'Italien', 'USA', 'Mexiko', 'Peru', 'Malaysia', 'Singapore', 'Japan'],
   equipment: ['Matberedare', 'Fritös', 'Slow cooker', 'Bakstål / pizzasten', 'Sous vide', 'Köttkvarn', 'Vakuummaskin', 'Grillpanna', 'Kolgrill', 'Wokpanna'],
@@ -195,7 +196,7 @@ const DEFAULT_PROFILE = '';
 const DEFAULT_PREFS = {
   portions: 4, bigEaters: false, foodieAdded: true, frozen: true,
   allergies: '',
-  weekdayTime: '30', weekendTime: '60', weekendGear: true,
+  weekdayTime: '30', weekendTime: '60', weekendGear: true, dinnerWeekday: '18:00', dinnerWeekend: '18:30',
   healthWho: '', healthNote: '', healthyAlt: false,
   cuisines: ['Sverige', 'Italien'],
   equipment: [],
@@ -435,6 +436,24 @@ function todayTime() {
   const o = timeOverride();
   return { key: o || def, label: timeLabel(o || def), manual: !!o && o !== def, def };
 }
+function hm(str) { const m = String(str || '').match(/^(\d{1,2})[:.](\d{2})$/); return m ? +m[1] * 60 + +m[2] : null; }
+function fmtDur(min) { const a = Math.abs(min), h = Math.floor(a / 60), m = a % 60; return (h ? `${h} h ` : '') + `${m} min`; }
+function clockText() {
+  const n = new Date(), d = dayInfo(n), P = S.data.prefs;
+  const dinner = d.weekend ? P.dinnerWeekend : P.dinnerWeekday;
+  const nowMin = n.getHours() * 60 + n.getMinutes(), dm = hm(dinner);
+  let line = `Klockan är ${d.time}.`;
+  if (dm != null) {
+    const left = dm - nowMin;
+    line += left > 0 ? ` Middag brukar serveras ${dinner} – om ${fmtDur(left)}.` : ` Middagstiden (${dinner}) passerades för ${fmtDur(left)} sedan.`;
+  }
+  const lines = [line];
+  if (S.cookStart) lines.push(`Matlagningen startade ${new Date(S.cookStart).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })} (${fmtDur(Math.floor((n - S.cookStart) / 60000))} sedan).`);
+  if (S.route.view === 'recipe' && S.current.recipe && S.activeStep != null) lines.push(`Vi är på steg ${S.activeStep + 1} av ${S.current.recipe.steps.length}.`);
+  const tms = (S.timers || []).map(t => { const s = Math.round((t.end - Date.now()) / 1000); return s > 0 ? `${t.label}: ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} kvar` : `${t.label}: klar`; });
+  if (tms.length) lines.push(`Pågående timers: ${tms.join('; ')}.`);
+  return lines.join('\n');
+}
 function season(m = new Date().getMonth()) {
   return ['vinter', 'vinter', 'vår', 'vår', 'vår', 'sommar', 'sommar', 'sommar', 'höst', 'höst', 'höst', 'vinter'][m];
 }
@@ -533,7 +552,8 @@ ${mem}
 ${book}
 
 ## IDAG
-Idag är det ${d.name} ${d.date}, klockan ${d.time}. Säsong: ${season()}. Dagläge: ${d.label}${d.manual ? ' (valt manuellt)' : ''}, tidsram ${todayTime().label}.
+Idag är det ${d.name} ${d.date}. Säsong: ${season()}. Dagläge: ${d.label}${d.manual ? ' (valt manuellt)' : ''}, tidsram ${todayTime().label}.
+${clockText()}
 
 ## DET SOM VISAS PÅ SKÄRMEN
 ${onScreen}
@@ -768,7 +788,7 @@ async function send(text, image, opts = {}) {
       const keepId = S.route.view === 'recipe' ? S.current.recipeSavedId : null;
       const sameDish = S.route.view === 'recipe' && S.current.recipe;
       S.current.recipe = recipe; S.current.recipeSavedId = keepId; S.current.dirty = !!keepId;
-      if (!sameDish) { S.checked = {}; S.doneSteps = {}; S.activeStep = null; newSession(); }
+      if (!sameDish) { S.checked = {}; S.doneSteps = {}; S.activeStep = null; S.cookStart = null; newSession(); }
       addHistory(recipe, keepId);
       if (!(S.portions && S.portions.title === recipe.title)) S.portions = null;
       msg.view = { recipe };
@@ -918,7 +938,9 @@ function viewHome() {
   const P = S.data.prefs;
   const t = todayTime();
   const gear = d.weekend && P.weekendGear ? ['Kolgrill', 'Sous vide', 'Rökskåp', 'Pizzaugn'].filter(x => P.equipment.includes(x) || P.customEquipment.includes(x)).slice(0, 2).map(x => x.toLowerCase()) : [];
-  const hint = `${d.manual ? (d.weekend ? 'Helgläge' : 'Vardagsläge') : `Det är <strong>${d.name}</strong> – ${d.weekend ? 'helg' : 'vardag'}`}. Tidsram <strong>${t.label}</strong>${d.weekend ? (gear.length ? `, gärna ${gear.join(' eller ')}` : ', gärna ett projekt') : ', lite disk'}. <button class="linkish" data-status>Ändra</button>`;
+  const dinner = d.weekend ? P.dinnerWeekend : P.dinnerWeekday, nowMin = new Date().getHours() * 60 + new Date().getMinutes(), dm = hm(dinner);
+  const startBy = dm != null && dm - nowMin > 0 ? (() => { const st = dm - (parseInt(t.key) || 180); const left = dm - nowMin; return ` Middag ${dinner} – ${left <= (parseInt(t.key) || 180) ? '<strong>börja nu</strong>' : `börja senast ${String(Math.floor(st / 60)).padStart(2, '0')}:${String(st % 60).padStart(2, '0')}`}.`; })() : '';
+  const hint = `${d.manual ? (d.weekend ? 'Helgläge' : 'Vardagsläge') : `Det är <strong>${d.name}</strong> – ${d.weekend ? 'helg' : 'vardag'}`}. Tidsram <strong>${t.label}</strong>${d.weekend ? (gear.length ? `, gärna ${gear.join(' eller ')}` : ', gärna ett projekt') : ', lite disk'}.${startBy} <button class="linkish" data-status>Ändra</button>`;
   const hist = (S.data.history || []).slice(0, 8);
   if (S.busy === 'flow') {
     return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Souschefen tänker…</span></div></section>`;
@@ -1168,9 +1190,11 @@ function prefsCards() {
       <div class="day-cols">
         <div class="day-col"><h3>Vardag <span class="muted">mån–tor</span></h3>
           <div class="field"><label>Tidsram</label>${seg('weekdayTime', TIMES.slice(0, 3))}</div>
+          <div class="field"><label for="dinnerWeekday">Middag serveras</label><input type="time" id="dinnerWeekday" data-ptext="dinnerWeekday" value="${esc(P.dinnerWeekday)}" class="time-input"></div>
           <p class="hint">Genvägar, allt-i-ett och lite disk.</p></div>
         <div class="day-col"><h3>Helg <span class="muted">fre–sön</span></h3>
           <div class="field"><label>Tidsram</label>${seg('weekendTime', TIMES.slice(3))}</div>
+          <div class="field"><label for="dinnerWeekend">Middag serveras</label><input type="time" id="dinnerWeekend" data-ptext="dinnerWeekend" value="${esc(P.dinnerWeekend)}" class="time-input"></div>
           <button type="button" class="chip opt" data-pbool="weekendGear" aria-pressed="${P.weekendGear}">Använd gärna specialutrustningen</button></div>
       </div>
     </div>
@@ -1240,8 +1264,8 @@ function viewWelcome() {
     <h1>Vardag och helg</h1>
     <p class="w-lead">Hur mycket tid har ni för matlagningen? Appen väljer vardag eller helg efter veckodagen, och ni kan ändra det för stunden uppe till höger.</p>
     <div class="day-cols">
-      <div class="day-col"><h3>Vardag <span class="muted">mån–tor</span></h3>${seg('weekdayTime', TIMES.slice(0, 3))}</div>
-      <div class="day-col"><h3>Helg <span class="muted">fre–sön</span></h3>${seg('weekendTime', TIMES.slice(3))}
+      <div class="day-col"><h3>Vardag <span class="muted">mån–tor</span></h3>${seg('weekdayTime', TIMES.slice(0, 3))}<div style="margin-top:10px"><div class="field"><label for="dinnerWeekday">Middag serveras</label><input type="time" id="dinnerWeekday" data-ptext="dinnerWeekday" value="${esc(P.dinnerWeekday)}" class="time-input"></div></div></div>
+      <div class="day-col"><h3>Helg <span class="muted">fre–sön</span></h3>${seg('weekendTime', TIMES.slice(3))}<div style="margin-top:10px"><div class="field"><label for="dinnerWeekend">Middag serveras</label><input type="time" id="dinnerWeekend" data-ptext="dinnerWeekend" value="${esc(P.dinnerWeekend)}" class="time-input"></div></div>
         <div style="margin-top:10px"><button type="button" class="chip opt" data-pbool="weekendGear" aria-pressed="${P.weekendGear}">Använd gärna specialutrustning på helgen</button></div></div>
     </div>`;
   else if (k === 4) body = `
@@ -1404,13 +1428,13 @@ $('#stage').addEventListener('click', async e => {
   if (oh) { const h = (S.data.history || []).find(x => x.id === oh.dataset.hist); if (h) { const saved = h.savedId && S.data.recipes.find(x => x.id === h.savedId); S.current.recipe = JSON.parse(JSON.stringify(saved || h.recipe)); S.current.recipeSavedId = saved ? saved.id : null; S.current.dirty = false; S.checked = {}; S.doneSteps = {}; S.activeStep = null; S.portions = null; newSession(); S.chat = []; saveChat(); saveCurrent(); go('recipe'); addHistory(S.current.recipe, S.current.recipeSavedId); saveSession(); } return; }
   const jump = t.closest('[data-jump]');
   if (jump) { scrollToSec(jump.dataset.jump); return; }
-  if (t.closest('[data-startcook]')) { if (S.activeStep == null) S.activeStep = 0; refreshSteps(); scrollToSec('r-steps'); saveSession(); return; }
+  if (t.closest('[data-startcook]')) { if (S.activeStep == null) S.activeStep = 0; if (!S.cookStart) S.cookStart = Date.now(); refreshSteps(); scrollToSec('r-steps'); saveSession(); return; }
   const tm = t.closest('[data-timer]');
   if (tm) { const s = S.current.recipe.steps[+tm.dataset.timer]; startTimer(`Steg ${+tm.dataset.timer + 1}`, s.minutes); return; }
   const dn = t.closest('[data-done]');
   if (dn) { const n = +dn.dataset.done; S.doneSteps[n] = !S.doneSteps[n]; if (S.doneSteps[n] && S.activeStep === n) S.activeStep = n + 1 < S.current.recipe.steps.length ? n + 1 : null; refreshSteps(); saveSession(); return; }
   const step = t.closest('[data-step]');
-  if (step && !t.closest('button')) { const n = +step.dataset.step; S.activeStep = S.activeStep === n ? null : n; refreshSteps(); saveSession(); return; }
+  if (step && !t.closest('button')) { const n = +step.dataset.step; S.activeStep = S.activeStep === n ? null : n; if (!S.cookStart) S.cookStart = Date.now(); refreshSteps(); saveSession(); return; }
   if (t.closest('[data-save]')) { saveRecipe(); return; }
   if (t.closest('[data-cooked]')) { const r = savedRecipe(); r.cooked = [...(r.cooked || []), now()]; touch(r); saveData(); toast('Antecknat! Sätt gärna betyg och skriv vad som blev bra.'); renderStage(); const n = $('#notes'); if (n) n.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   const rate = t.closest('[data-rate]');
