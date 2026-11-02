@@ -997,6 +997,7 @@ function viewHome() {
       </div>
     </form>
     ${hist.length || S.current.suggestions ? `<div class="recent-strip">
+      ${syncNote()}
       <div class="strip-head"><h2>Senaste recept</h2>${hist.length ? `<button class="linkish" data-showhist>Visa alla (${(S.data.history || []).length})</button>` : ''}</div>
       <div class="strip">
         ${S.current.suggestions ? `<button class="mini-card sugg-card" data-go="suggestions"><span class="mc-title">Senaste förslagen</span><span class="mc-sub">${S.current.suggestions.length} rätter</span></button>` : ''}
@@ -1158,6 +1159,11 @@ function bookRow(r) {
     ${r.notes ? `<span class="note-snip">${esc(r.notes.slice(0, 140))}${r.notes.length > 140 ? '…' : ''}</span>` : ''}
   </button>`;
 }
+function syncNote() {
+  if (!S.settings.ghToken) return `<div class="sync-note">Historiken finns bara på den här enheten. <button class="linkish" data-go="settings">Slå på delning</button> för att fortsätta på en annan enhet.</div>`;
+  if (/misslyckades|Fel token/.test(S.sync.state || '')) return `<div class="sync-note err">Delningen fungerar inte just nu (${esc(S.sync.state)}${$('#sync')?.title ? ': ' + esc($('#sync').title) : ''}). <button class="linkish" data-go="settings">Kontrollera kopplingen</button></div>`;
+  return '';
+}
 function histDate(h) { return new Date(h.viewedAt).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' }); }
 function histSaved(h) { return h.savedId && S.data.recipes.some(x => x.id === h.savedId); }
 function histRow(h) {
@@ -1180,7 +1186,8 @@ function viewBook() {
     <div class="book-head"><h1>Kokboken</h1>
       <input class="search" id="bookSearch" type="search" placeholder="Sök bland senaste recepten" value="${esc(S.bookQuery)}" aria-label="Sök bland senaste recepten"></div>
     ${tabs}
-    <p class="muted" style="margin:0 0 12px">Alla recept ni tittat på de senaste veckorna, även de som inte är sparade. Synkas mellan era enheter.</p>
+    <p class="muted" style="margin:0 0 12px">Alla recept ni tittat på de senaste veckorna, även de som inte är sparade.</p>
+    ${syncNote()}
     ${hist.length === 0 ? `<div class="empty"><h2>Ingen historik än</h2><p>Recept ni öppnar hamnar här automatiskt.</p><button class="btn" data-go="home">Till start</button></div>`
       : list.length ? `<div class="book-list">${list.map(histRow).join('')}</div>` : `<p class="muted">Inget matchar.</p>`}
   </section>`;
