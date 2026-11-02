@@ -100,7 +100,8 @@ DAG, TID & SÄSONG
 LÄGE 1 – SNABBA FRÅGOR (under matlagning)
 - Börja med vad jag ska göra nu, sedan kort varför. Max 3–5 meningar eller punkter.
 - Utgå från receptet på skärmen och vilket steg vi troligen är på.
-- Frågar jag "kan jag…" eller "går det att…" – svara bara. Säger jag "byt", "ändra", "gör om" eller "lägg till" – uppdatera receptet (LÄGE 2) och säg i en mening vad som ändrats.
+- Frågar jag "kan jag…" eller "går det att…" – svara bara, och sätt "offerUpdate": true om svaret innebär en ändring av receptet (appen visar då en knapp så vi kan välja att uppdatera). Säger jag "byt", "ändra", "gör om", "lägg till" eller "ja, uppdatera" – skicka HELA det ändrade receptet i "recipe" och säg i en mening vad som ändrats.
+- Skriv ALDRIG att receptet är uppdaterat, ändrat eller justerat om du inte samtidigt skickar hela receptet i "recipe".
 
 LÄGE 2 – RECEPT (vald rätt, länk eller inklistrat recept, eller ändring)
 - Metriska mått skalade till portionerna, i köpvänliga mängder (1 burk 400 ml, 1 förp).
@@ -223,6 +224,7 @@ const RESPONSE_SCHEMA = {
       tips: S_ARR },
       required: ['title', 'ingredients', 'steps'] },
     learn: S_ARR,
+    offerUpdate: { type: 'BOOLEAN' },
   },
   required: ['reply'],
   propertyOrdering: ['reply', 'suggestions', 'recipe', 'learn'],
@@ -240,7 +242,8 @@ Du svarar inuti en app. Svara ALLTID med exakt ett JSON-objekt – ingen text f�
     "health": { "summary": "≈45 g protein och 650 kcal per portion. …", "tips": ["konkret byte för den som vill äta lättare"] },
     "tips": [""]
   },
-  "learn": [ "kort ny lärdom om familjens smak/vanor" ]
+  "learn": [ "kort ny lärdom om familjens smak/vanor" ],
+  "offerUpdate": false
 }
 Regler:
 - LÄGE 3 (inspiration) → fyll "suggestions". LÄGE 2 (komplett recept, eller när jag ber dig ändra receptet som visas) → fyll "recipe" med HELA receptet. LÄGE 1 → båda null.
@@ -724,7 +727,7 @@ function parseReply(raw) {
     const r = partialReply(t);
     o = { reply: r || (a >= 0 ? '' : t) };
   }
-  return { reply: cleanReply(o.reply), suggestions: o.suggestions ?? null, recipe: o.recipe ?? null, learn: Array.isArray(o.learn) ? o.learn : [] };
+  return { reply: cleanReply(o.reply), suggestions: o.suggestions ?? null, recipe: o.recipe ?? null, learn: Array.isArray(o.learn) ? o.learn : [], offerUpdate: !!o.offerUpdate };
 }
 function cleanReply(r) {
   if (r == null) return '';
@@ -735,6 +738,24 @@ function cleanReply(r) {
   r = r.replace(/\n?\[(Visade receptet|Visade förslag)[^\]]*\]/g, '').replace(/^"|"$/g, '').trim();
   return r;
 }
+function recipeDiff(a, b) {
+  if (!a || !b) return [];
+  const key = i => (i.name || '').toLowerCase().trim();
+  const A = new Map(a.ingredients.map(i => [key(i), i])), B = new Map(b.ingredients.map(i => [key(i), i]));
+  const out = [];
+  const removed = [...A.keys()].filter(k => !B.has(k)), added = [...B.keys()].filter(k => !A.has(k));
+  if (removed.length === 1 && added.length === 1) out.push(`${A.get(removed[0]).name} → ${B.get(added[0]).name}${B.get(added[0]).amount ? ` (${B.get(added[0]).amount})` : ''}`);
+  else {
+    added.forEach(k => out.push(`+ ${B.get(k).amount ? B.get(k).amount + ' ' : ''}${B.get(k).name}`));
+    removed.forEach(k => out.push(`− ${A.get(k).name}`));
+  }
+  [...B.keys()].filter(k => A.has(k) && (A.get(k).amount || '') !== (B.get(k).amount || '')).forEach(k => out.push(`${B.get(k).name}: ${A.get(k).amount} → ${B.get(k).amount}`));
+  const sa = a.steps.map(x => x.text).join('|'), sb = b.steps.map(x => x.text).join('|');
+  if (sa !== sb) out.push(a.steps.length !== b.steps.length ? `stegen: ${a.steps.length} → ${b.steps.length}` : 'stegen är justerade');
+  if ((a.title || '') !== (b.title || '')) out.push(`namn: ${b.title}`);
+  return out;
+}
+const CLAIM_RE = /\b(har (nu )?(uppdaterat|ändrat|justerat|bytt|lagt till)|receptet är (nu )?(uppdaterat|ändrat|justerat)|uppdaterat receptet|ändrat receptet)\b/i;
 function normalizeRecipe(r) {
   if (!r || !Array.isArray(r.ingredients) || !Array.isArray(r.steps)) return null;
   r.ingredients = r.ingredients.map((x, i) => ({ id: String(x.id || `i${i + 1}`), amount: x.amount || '', name: x.name || '', note: x.note || '', group: x.group || '' }));
@@ -766,7 +787,7 @@ async function send(text, image, opts = {}) {
   if ((!text && !image) || S.busy) return;
   const flow = !!opts.flow;
   S.readingHost = (() => { const l = (text.match(/https?:\/\/[^\s]+/) || [])[0]; try { return l ? new URL(l).hostname.replace(/^www\./, '') : ''; } catch { return ''; } })();
-  const userMsg = { role: 'user', text: text || 'Vad kan jag laga av det här?', image, at: now(), hidden: flow };
+  const userMsg = { role: 'user', text: text || 'Vad kan jag laga av det här?', image, at: now(), hidden: flow, ...(opts.display ? { display: opts.display } : {}) };
   S.chat.push(userMsg);
   S.busy = flow ? 'flow' : 'chat'; saveChat(); renderChat(true);
   if (S.route.view === 'home' || S.route.view === 'suggestions') renderStage();
@@ -787,12 +808,13 @@ async function send(text, image, opts = {}) {
     if (recipe) {
       const keepId = S.route.view === 'recipe' ? S.current.recipeSavedId : null;
       const sameDish = S.route.view === 'recipe' && S.current.recipe;
+      const prevRecipe = sameDish ? S.current.recipe : null;
       S.current.recipe = recipe; S.current.recipeSavedId = keepId; S.current.dirty = !!keepId;
       if (!sameDish) { S.checked = {}; S.doneSteps = {}; S.activeStep = null; S.cookStart = null; newSession(); }
       addHistory(recipe, keepId);
       if (!(S.portions && S.portions.title === recipe.title)) S.portions = null;
       msg.view = { recipe };
-      if (flow) msg.hidden = true; else msg.updated = true;
+      if (flow) msg.hidden = true; else { const d = recipeDiff(prevRecipe, recipe); msg.updated = prevRecipe ? (d.length ? d : 'same') : ['nytt recept']; }
       if (S.route.view !== 'recipe') go('recipe', { keepChat: true }); else { const sc = $('#stage').scrollTop; renderStage(); $('#stage').scrollTop = sc; }
       saveSession();
     } else if (sugg) {
@@ -808,6 +830,11 @@ async function send(text, image, opts = {}) {
       const fresh = learned.filter(l => !existing.has(l.toLowerCase()));
       fresh.forEach(t => S.data.memory.push({ id: uid(), text: t, at: now(), updatedAt: now() }));
       if (fresh.length) { msg.learned = fresh; saveData(); }
+    }
+    // Svar som föreslår (eller påstår) en ändring utan att skicka receptet: erbjud knapp
+    if (!recipe && !sugg && !flow && S.route.view === 'recipe' && S.current.recipe && (o.offerUpdate || CLAIM_RE.test(msg.text))) {
+      msg.offer = true;
+      if (CLAIM_RE.test(msg.text)) msg.notApplied = true;
     }
     // Motfråga eller vanligt svar på ett receptval: visa i chatten med frågan
     if (!recipe && !sugg) { userMsg.hidden = false; msg.hidden = false; openChat(true); }
@@ -886,14 +913,17 @@ function renderChat(scroll) {
     const asks = r
       ? [['Kan jag förbereda något i förväg?', 'Förbereda i förväg'], ['Vad kan jag byta ut om jag saknar något?', 'Saknar en råvara'], ['Gör receptet lite lättare utan att tappa smak.', 'Gör den lättare']]
       : [['Hur räddar jag en sås som skurit sig?', 'Såsen skar sig'], ['Vilken innertemperatur ska fläskkarré ha?', 'Innertemp karré'], ['Hur länge ska ris vila efter kokning?', 'Vila riset']];
-    log.innerHTML = `<div class="chat-empty"><p>${r ? `Frågor om <strong>${esc(r.title)}</strong>. Ber du om en ändring uppdateras receptet direkt.` : 'Snabba frågor medan du lagar. Recept väljer du i huvudfönstret.'}</p>
+    log.innerHTML = `<div class="chat-empty"><p>${r ? `Frågor om <strong>${esc(r.title)}</strong>. Säg "byt" eller "ändra" så uppdateras receptet, eller tryck på Uppdatera receptet när souschefen föreslår något.` : 'Snabba frågor medan du lagar. Recept väljer du i huvudfönstret.'}</p>
       ${asks.map(([q, l]) => `<button class="chip" data-ask="${esc(q)}">${esc(l)}</button>`).join('')}</div>`;
   } else {
-    log.innerHTML = visible.map(m => {
-      if (m.role === 'user') return `<div class="msg user">${m.image ? `<img src="${m.image.url}" alt="Bifogat foto">` : ''}${md(m.text)}</div>`;
+    log.innerHTML = visible.map(m => { const i = S.chat.indexOf(m);
+      if (m.role === 'user') return `<div class="msg user">${m.image ? `<img src="${m.image.url}" alt="Bifogat foto">` : ''}${md(m.display || m.text)}</div>`;
       if (m.role === 'error') return `<div class="msg error">${esc(m.text)}${m.nokey ? ` <button class="view-link" data-go="settings">Öppna inställningar</button>` : ''}</div>`;
       let extra = '';
-      if (m.updated) extra += `<div class="learned">✓ Receptet är uppdaterat</div>`;
+      if (m.updated === 'same') extra += `<div class="learned">Receptet skickades men inget ändrades. <button class="view-link" data-apply="${i}">Försök igen</button></div>`;
+      else if (Array.isArray(m.updated)) extra += `<div class="learned upd">✓ Receptet är uppdaterat${m.updated.length ? ':<ul>' + m.updated.slice(0, 6).map(x => `<li>${esc(x)}</li>`).join('') + '</ul>' : ''}</div>`;
+      else if (m.updated === true) extra += `<div class="learned">✓ Receptet är uppdaterat</div>`;
+      if (m.offer && !m.applied) extra += `<div class="offer">${m.notApplied ? '<span>Receptet är inte ändrat än.</span>' : ''}<button class="btn small" data-apply="${i}">Uppdatera receptet</button><button class="ghost small" data-noapply="${i}">Nej tack</button></div>`;
       if (m.learned?.length) extra += `<div class="learned">Souschefen kommer ihåg: ${m.learned.map(esc).join(' · ')}</div>`;
       return `<div class="msg assistant">${md(m.text) || ''}${extra}</div>`;
     }).join('');
@@ -905,7 +935,11 @@ function renderChat(scroll) {
 }
 $('#chatLog').addEventListener('click', e => {
   const a = e.target.closest('[data-ask]');
-  if (a) send(a.dataset.ask);
+  if (a) { send(a.dataset.ask); return; }
+  const ap = e.target.closest('[data-apply]');
+  if (ap) { const m = S.chat[+ap.dataset.apply]; if (m) { m.applied = true; } send('Ja, uppdatera receptet enligt ditt förslag. Skicka hela det ändrade receptet.', null, { display: '✓ Uppdatera receptet' }); return; }
+  const na = e.target.closest('[data-noapply]');
+  if (na) { const m = S.chat[+na.dataset.noapply]; if (m) m.applied = true; saveChat(); renderChat(); }
 });
 
 /* ============ Vyer ============ */
