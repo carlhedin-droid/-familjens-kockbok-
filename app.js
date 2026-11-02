@@ -925,7 +925,7 @@ function viewHome() {
   }
   return `<section class="home">
     ${sessionBanner()}
-    <h1>Vad har ni, och vad är ni sugna på?</h1>
+    <h1>Vad lagar vi idag?</h1>
     <p class="day-line">${hint}</p>
     <form class="asker" id="homeAsk">
       <textarea id="homeInput" placeholder="Vad har ni hemma? T.ex. kycklinglår, vitkål och kokosmjölk – något starkt.&#10;&#10;Eller klistra in en länk till ett recept så renskriver souschefen det åt er." aria-label="Beskriv vad ni har och vad ni vill ha"></textarea>
