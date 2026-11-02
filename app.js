@@ -782,7 +782,7 @@ function recipeDiff(a, b) {
   if ((a.title || '') !== (b.title || '')) out.push(`namn: ${b.title}`);
   return out;
 }
-const CLAIM_RE = /\b(har (nu )?(uppdaterat|ändrat|justerat|bytt|lagt till)|receptet är (nu )?(uppdaterat|ändrat|justerat)|uppdaterat receptet|ändrat receptet)\b/i;
+const CLAIM_RE = /(uppdaterat|uppdaterade|uppdaterats|uppdaterar|ändrat|ändrade|ändrats|justerat|justerade|justerats|har bytt|bytt ut|bytts ut|lagt till|lagts till|tagit bort|tagits bort|här är (det|ditt|ert) (nya|ändrade|reviderade))/i;
 function normalizeRecipe(r) {
   if (!r || !Array.isArray(r.ingredients) || !Array.isArray(r.steps)) return null;
   r.ingredients = r.ingredients.map((x, i) => ({ id: String(x.id || `i${i + 1}`), amount: x.amount || '', name: x.name || '', note: x.note || '', group: x.group || '' }));
@@ -859,9 +859,12 @@ async function send(text, image, opts = {}) {
       if (fresh.length) { msg.learned = fresh; saveData(); }
     }
     // Svar som föreslår (eller påstår) en ändring utan att skicka receptet: erbjud knapp
-    if (!recipe && !sugg && !flow && S.route.view === 'recipe' && S.current.recipe && (o.offerUpdate || CLAIM_RE.test(msg.text))) {
+    // Varje svar medan ett recept är öppet får en knapp – starkare om souschefen föreslår/påstår en ändring
+    if (!recipe && !sugg && !flow && S.route.view === 'recipe' && S.current.recipe && !msg.placeholder) {
+      const claim = CLAIM_RE.test(msg.text), bad = !!o.recipe;
       msg.offer = true;
-      if (CLAIM_RE.test(msg.text)) msg.notApplied = true;
+      msg.offerStrong = !!(o.offerUpdate || claim || bad);
+      if (claim || bad) msg.notApplied = true;
     }
     // Motfråga eller vanligt svar på ett receptval: visa i chatten med frågan
     if (!recipe && !sugg) { userMsg.hidden = false; msg.hidden = false; openChat(true); }
@@ -950,7 +953,9 @@ function renderChat(scroll) {
       if (m.updated === 'same') extra += `<div class="learned">Receptet skickades men inget ändrades. <button class="view-link" data-apply="${i}">Försök igen</button></div>`;
       else if (Array.isArray(m.updated)) extra += `<div class="learned upd">✓ Receptet är uppdaterat${m.updated.length ? ':<ul>' + m.updated.slice(0, 6).map(x => `<li>${esc(x)}</li>`).join('') + '</ul>' : ''}</div>`;
       else if (m.updated === true) extra += `<div class="learned">✓ Receptet är uppdaterat</div>`;
-      if (m.offer && !m.applied) extra += `<div class="offer">${m.notApplied ? '<span>Receptet är inte ändrat än.</span>' : ''}<button class="btn small" data-apply="${i}">Uppdatera receptet</button><button class="ghost small" data-noapply="${i}">Nej tack</button></div>`;
+      if (m.offer && !m.applied) extra += m.offerStrong || m.offerStrong === undefined
+        ? `<div class="offer">${m.notApplied ? '<span>Receptet är inte ändrat än.</span>' : ''}<button class="btn small" data-apply="${i}">Uppdatera receptet</button><button class="ghost small" data-noapply="${i}">Nej tack</button></div>`
+        : `<div class="offer weak"><button class="linkish" data-apply="${i}">Uppdatera receptet utifrån svaret</button></div>`;
       if (m.learned?.length) extra += `<div class="learned">Souschefen kommer ihåg: ${m.learned.map(esc).join(' · ')}</div>`;
       return `<div class="msg assistant">${md(m.text) || ''}${extra}</div>`;
     }).join('');
@@ -964,7 +969,7 @@ $('#chatLog').addEventListener('click', e => {
   const a = e.target.closest('[data-ask]');
   if (a) { send(a.dataset.ask); return; }
   const ap = e.target.closest('[data-apply]');
-  if (ap) { const m = S.chat[+ap.dataset.apply]; if (m) { m.applied = true; } send('Ja, uppdatera receptet enligt ditt förslag. Skicka hela det ändrade receptet.', null, { display: '✓ Uppdatera receptet' }); return; }
+  if (ap) { const m = S.chat[+ap.dataset.apply]; if (m) { m.applied = true; } send('Ja, uppdatera receptet enligt ditt senaste svar. Skicka HELA det ändrade receptet i "recipe" (alla ingredienser och alla steg).', null, { display: '✓ Uppdatera receptet' }); return; }
   const na = e.target.closest('[data-noapply]');
   if (na) { const m = S.chat[+na.dataset.noapply]; if (m) m.applied = true; saveChat(); renderChat(); }
 });

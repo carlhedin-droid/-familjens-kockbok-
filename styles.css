@@ -564,3 +564,6 @@ details.adv[open] summary { margin-bottom: 8px; }
 
 .sync-note { font-size: 14px; color: var(--muted); background: var(--surface-2); border-radius: var(--r-md); padding: 8px 12px; margin: 0 0 12px; }
 .sync-note.err { background: transparent; border: 1.5px solid var(--sambal); color: var(--ink); }
+
+.msg .offer.weak { margin-top: 6px; }
+.msg .offer.weak .linkish { font-size: 14px; }
