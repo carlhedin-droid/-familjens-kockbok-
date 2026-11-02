@@ -6,7 +6,7 @@ Familjens souschef och kokbok som webbapp. Fungerar på dator, mobil och platta 
 - **Receptet:** Ingredienser och steg. Stående skärm: ingredienserna först, sedan stegen. Liggande skärm: steg och ingredienser sida vid sida. Portioner med − och +, timers, och skärmen hålls tänd.
 - **Fråga souschefen:** Chatt bredvid receptet för frågor under matlagningen. Ber du om en ändring uppdateras receptet.
 - **Snabbval (uppe till höger):** Vardag eller helg, tid idag och portioner.
-- **Inställningar:** Hushåll och allergier, tidsramar för vardag och helg, hälsomål, favoritländer och specialutrustning.
+- **Inställningar:** Hushåll och allergier, tidsramar för vardag och helg, hälsomål, favoritländer, specialutrustning och bakning av bröd.
 - **Kokboken:** Spara recept, ge betyg och skriv anteckningar. Souschefen läser kokboken och smakminnet varje gång.
 
 ## Kom igång

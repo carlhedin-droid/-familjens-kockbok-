@@ -170,6 +170,15 @@ const DEFAULT_HEALTH = 'Volym + spets: mättande grönt som bas och en smakspets
 const STANDARD_KITCHEN = 'spis, ugn, mikro, stekpannor, kastruller (även stor gryta), ugnsformar, plåtar, stavmixer, elvisp, våg och vanliga knivar';
 const CUISINE_MAP = { Svenska: ['Sverige'], Nordiska: ['Sverige'], Franska: ['Frankrike'], Italienska: ['Italien'], Spanska: ['Spanien'], Grekiska: ['Grekland'], Libanesiska: ['Libanon'], Turkiska: ['Turkiet'], Indiska: ['Indien'], Thailändska: ['Thailand'], Malaysiska: ['Malaysia'], Singaporianska: ['Singapore'], Vietnamesiska: ['Vietnam'], Kinesiska: ['Kina'], Koreanska: ['Korea'], Japanska: ['Japan'], Amerikanska: ['USA'], Mexikanska: ['Mexiko'], Sydamerikanska: ['Peru', 'Argentina'] };
 const EQUIP_MAP = { 'Airfryer / fritös': 'Fritös', 'Bakstål': 'Bakstål / pizzasten', 'Rökskåp': 'Rökgrill / rökskåp', 'Mixer': 'Kraftfull mixer', 'Ångkokare': 'Ångugn', 'Stor soppkastrull': null };
+const BREAD_OPT = {
+  leaven: ['Färsk jäst', 'Torrjäst', 'Surdeg', 'Förjäsning (poolish/biga)'],
+  flour: ['Vetemjöl', 'Rågmjöl', 'Dinkel', 'Fullkorn', 'Durum', 'Ölandsvete'],
+  bake: ['Gjutjärnsgryta', 'Bakstål', 'Ånga i ugnen', 'Plåt', 'Form'],
+  proof: [['', 'Efter receptet'], ['samma', 'Samma dag'], ['natt', 'Över natten i kyl'], ['lang', '1–3 dygn i kyl']],
+  knead: [['', 'Efter receptet'], ['hand', 'För hand'], ['maskin', 'Degblandare'], ['vik', 'Utan knådning, vik degen']],
+  hydration: [['', 'Efter receptet'], ['fast', 'Fast, ca 60–65 %'], ['mellan', 'Mellan, ca 65–75 %'], ['hog', 'Hög, över 75 %']],
+};
+const BREAD_DEFAULTS = { breadLeaven: [], breadStarter: false, breadProof: '', breadKnead: '', breadHydration: '', breadFlour: [], breadBake: [], breadNote: '' };
 const CARL_PREFS = {
   portions: 4, bigEaters: true, foodieAdded: true,
   allergies: 'Inga kända',
@@ -179,6 +188,7 @@ const CARL_PREFS = {
   equipment: ['Matberedare', 'Fritös', 'Slow cooker', 'Bakstål / pizzasten', 'Sous vide', 'Köttkvarn', 'Vakuummaskin', 'Grillpanna', 'Kolgrill', 'Wokpanna'],
   migratedV4: true,
   customEquipment: [],
+  ...BREAD_DEFAULTS,
 };
 // Neutrala förval för nya familjer (fylls i via introduktionen)
 const DEFAULT_PROFILE = '';
@@ -191,6 +201,7 @@ const DEFAULT_PREFS = {
   equipment: [],
   migratedV4: true,
   customEquipment: [],
+  ...BREAD_DEFAULTS,
 };
 const HAD_DATA = (() => { try { return !!localStorage.getItem('fk.data') || !!(JSON.parse(localStorage.getItem('fk.settings') || '{}').geminiKey); } catch { return false; } })();
 
@@ -529,6 +540,21 @@ ${onScreen}
 
 ${FORMAT_RULES}`;
 }
+function breadText(P) {
+  const lab = (opts, k) => (opts.find(x => x[0] === k) || [, ''])[1];
+  const rows = [
+    P.breadLeaven.length && `jäsmedel ${P.breadLeaven.join(', ')}`,
+    P.breadStarter && 'vi har en levande surdegsgrund hemma',
+    P.breadProof && `jäsning ${lab(BREAD_OPT.proof, P.breadProof).toLowerCase()}`,
+    P.breadKnead && `knådning ${lab(BREAD_OPT.knead, P.breadKnead).toLowerCase()}`,
+    P.breadHydration && `degvätska (hydrering) ${lab(BREAD_OPT.hydration, P.breadHydration).toLowerCase()}`,
+    P.breadFlour.length && `mjöl ${P.breadFlour.join(', ')}`,
+    P.breadBake.length && `gräddning ${P.breadBake.join(', ')}`,
+    P.breadNote.trim() && `övrigt: ${P.breadNote.trim()}`,
+  ].filter(Boolean);
+  if (!rows.length) return '';
+  return `\n- Bakning av bröd (gäller bara bröd och annat jäst bakverk, inte vid renskrivning där originalet följs): ${rows.join('; ')}. Vilande jästid räknas inte in i tidsramen. Skriv ut när degen ska startas för att brödet ska bli klart i tid.`;
+}
 function prefsText(d) {
   const P = S.data.prefs, t = todayTime();
   const equip = [...P.equipment, ...P.customEquipment];
@@ -542,7 +568,7 @@ function prefsText(d) {
 - Lättare alternativ: ${P.healthyAlt ? `ja – fyll alltid "health" med hur rätten anpassas för ${P.healthWho || 'den'} som vill äta lättare` : 'bara om vi ber om det'}
 - Favoritländer (sprid förslagen över dessa kök): ${P.cuisines.join(', ') || 'alla'}
 - Standardutrustning (finns alltid): ${STANDARD_KITCHEN}
-- Specialutrustning vi har: ${equip.join(', ') || 'ingen utöver standard'}`;
+- Specialutrustning vi har: ${equip.join(', ') || 'ingen utöver standard'}${breadText(P)}`;
 }
 function stripRecipe(r) {
   const { id, savedAt, updatedAt, notes, rating, cooked, ...rest } = r;
@@ -1143,6 +1169,19 @@ function prefsCards() {
       ${OPT.equipment.map(([grp, list]) => `<div class="opt-group"><h3>${esc(grp)}</h3><div class="chips">${list.map(v => chip('equipment', v)).join('')}</div></div>`).join('')}
       <div class="chips">${P.customEquipment.map(v => `<button type="button" class="chip opt" data-premove="${esc(v)}" aria-pressed="true" title="Tryck för att ta bort">${esc(v)} ×</button>`).join('')}</div>
       <div class="row" style="margin-top:12px"><input id="equipNew" class="search" placeholder="Lägg till egen, t.ex. Plancha" style="max-width:none"><button class="ghost" data-equipadd>Lägg till</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Bakning av bröd</h2>
+      <p>Gäller när ni bakar bröd. Det ni lämnar tomt väljer souschefen efter receptet.</p>
+      <div class="opt-group"><h3>Jäsmedel</h3><div class="chips">${BREAD_OPT.leaven.map(v => chip('breadLeaven', v)).join('')}</div>
+        <div style="margin-top:10px"><button type="button" class="chip opt" data-pbool="breadStarter" aria-pressed="${P.breadStarter}">Vi har en levande surdegsgrund hemma</button></div></div>
+      <div class="field"><label>Jäsning</label>${seg('breadProof', BREAD_OPT.proof)}</div>
+      <div class="field"><label>Knådning</label>${seg('breadKnead', BREAD_OPT.knead)}</div>
+      <div class="field"><label>Degens fuktighet</label>${seg('breadHydration', BREAD_OPT.hydration)}</div>
+      <div class="opt-group"><h3>Mjöl vi gillar</h3><div class="chips">${BREAD_OPT.flour.map(v => chip('breadFlour', v)).join('')}</div></div>
+      <div class="opt-group"><h3>Gräddning</h3><div class="chips">${BREAD_OPT.bake.map(v => chip('breadBake', v)).join('')}</div></div>
+      <div class="field"><label for="breadNote">Övrigt om bakning</label><textarea id="breadNote" data-ptext="breadNote" rows="2" style="min-height:70px" placeholder="T.ex. gärna frön, ljus skorpa, bakar mest på helgen">${esc(P.breadNote)}</textarea></div>
     </div>`;
 }
 
