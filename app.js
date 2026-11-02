@@ -333,9 +333,30 @@ if (!S.current) S.current = { suggestions: null, suggIntro: '', recipe: null, re
 
 function saveSettings() { LS.set('fk.settings', S.settings); }
 function saveCurrent() { LS.set('fk.current', S.current); }
+function chatSig(list) { const v = list.filter(m => !m.hidden); return v.length + '|' + (v[v.length - 1]?.at || '') + '|' + v.map(m => (m.applied ? 'a' : '') + (m.text || '').length).join(','); }
 function saveChat() {
   const slim = S.chat.slice(-80).map(m => ({ ...m, image: undefined }));
   LS.set('fk.chat', slim);
+  // Dela chatten mellan enheter (bara synliga meddelanden, utan bilder)
+  if (typeof S.data === 'object' && !S.busy) {
+    const sig = chatSig(S.chat);
+    if (sig !== S.chatSigSent && sig !== S.data.chatSync?.sig) {
+      S.chatSigSent = sig;
+      S.data.chatSync = { msgs: S.chat.filter(m => !m.hidden).slice(-40).map(m => ({ ...m, image: undefined, view: undefined })), sig, device: S.settings.deviceId, updatedAt: now() };
+      S.chatAppliedAt = S.data.chatSync.updatedAt;
+      saveData();
+    }
+  }
+}
+function applyRemoteChat() {
+  const cs = S.data.chatSync;
+  if (!cs || cs.device === S.settings.deviceId || (S.chatAppliedAt || '') >= cs.updatedAt || S.busy) return false;
+  S.chatAppliedAt = cs.updatedAt; S.chatSigSent = cs.sig;
+  // Behåll dolda receptval (kontext till kocken) men ta in den delade synliga tråden
+  S.chat = [...S.chat.filter(m => m.hidden).slice(-10), ...cs.msgs];
+  S.chat.sort((a, b) => (a.at || '').localeCompare(b.at || ''));
+  LS.set('fk.chat', S.chat.slice(-80).map(m => ({ ...m, image: undefined })));
+  return true;
 }
 function saveData(opts = {}) {
   LS.set('fk.data', S.data);
@@ -385,6 +406,12 @@ function applySession(ss) {
   S.portions = ss.portions || null;
   if (Array.isArray(ss.chat)) S.chat = ss.chat;
   saveCurrent(); saveChat();
+}
+function joinIfActive(r) {
+  const ss = S.data.session;
+  if (!ss || ss.ended || !ss.recipe || recipeKey(ss.recipe) !== recipeKey(r)) return false;
+  if (Date.now() - new Date(ss.updatedAt).getTime() > 12 * 3600e3) return false;
+  applySession(ss); return true;
 }
 function otherSession() {
   const ss = S.data.session;
@@ -1466,7 +1493,7 @@ $('#stage').addEventListener('click', async e => {
   if (t.closest('[data-resume]')) { const ss = otherSession(); if (ss) { applySession(ss); go('recipe'); renderChat(true); saveSession(); } return; }
   if (t.closest('[data-endsession]')) { if (S.data.session) { S.data.session.ended = true; S.data.session.updatedAt = now(); saveData(); } renderStage(); return; }
   const oh = t.closest('[data-hist]');
-  if (oh) { const h = (S.data.history || []).find(x => x.id === oh.dataset.hist); if (h) { const saved = h.savedId && S.data.recipes.find(x => x.id === h.savedId); S.current.recipe = JSON.parse(JSON.stringify(saved || h.recipe)); S.current.recipeSavedId = saved ? saved.id : null; S.current.dirty = false; S.checked = {}; S.doneSteps = {}; S.activeStep = null; S.portions = null; newSession(); S.chat = []; saveChat(); saveCurrent(); go('recipe'); addHistory(S.current.recipe, S.current.recipeSavedId); saveSession(); } return; }
+  if (oh) { const h = (S.data.history || []).find(x => x.id === oh.dataset.hist); if (h) { const saved = h.savedId && S.data.recipes.find(x => x.id === h.savedId); S.current.recipe = JSON.parse(JSON.stringify(saved || h.recipe)); S.current.recipeSavedId = saved ? saved.id : null; S.current.dirty = false; S.checked = {}; S.doneSteps = {}; S.activeStep = null; S.portions = null; if (joinIfActive(S.current.recipe)) { go('recipe'); renderChat(true); return; } newSession(); S.chat = []; saveChat(); saveCurrent(); go('recipe'); addHistory(S.current.recipe, S.current.recipeSavedId); saveSession(); } return; }
   const jump = t.closest('[data-jump]');
   if (jump) { scrollToSec(jump.dataset.jump); return; }
   if (t.closest('[data-startcook]')) { if (S.activeStep == null) S.activeStep = 0; if (!S.cookStart) S.cookStart = Date.now(); refreshSteps(); scrollToSec('r-steps'); saveSession(); return; }
@@ -1493,7 +1520,7 @@ $('#stage').addEventListener('click', async e => {
   const op = t.closest('[data-open]');
   if (op) {
     const r = S.data.recipes.find(x => x.id === op.dataset.open);
-    if (r) { S.current.recipe = JSON.parse(JSON.stringify(r)); S.current.recipeSavedId = r.id; S.current.dirty = false; S.checked = {}; S.doneSteps = {}; S.activeStep = null; newSession(); saveCurrent(); go('recipe'); addHistory(r, r.id); saveSession(); }
+    if (r) { S.current.recipe = JSON.parse(JSON.stringify(r)); S.current.recipeSavedId = r.id; S.current.dirty = false; S.checked = {}; S.doneSteps = {}; S.activeStep = null; if (joinIfActive(r)) { S.current.recipeSavedId = r.id; go('recipe'); renderChat(true); return; } newSession(); saveCurrent(); go('recipe'); addHistory(r, r.id); saveSession(); }
     return;
   }
   const fl = t.closest('[data-filter]');
@@ -1678,7 +1705,13 @@ function tickTimers() {
   }).join('');
 }
 setInterval(() => { if (S.timers.length) tickTimers(); }, 1000);
-setInterval(() => { if (document.visibilityState === 'visible' && ['recipe', 'home'].includes(S.route.view)) syncNow(); }, 20000);
+let pollTick = 0;
+setInterval(() => {
+  if (document.visibilityState !== 'visible') return;
+  pollTick++;
+  const fast = $('#app').dataset.chat === 'open' || S.route.view === 'recipe';
+  if (fast ? pollTick % 2 === 0 : pollTick % 4 === 0) syncNow();
+}, 5000);
 $('#timers').addEventListener('click', e => {
   const b = e.target.closest('[data-tid]'); if (!b) return;
   const t = S.timers.find(x => x.id === b.dataset.tid);
@@ -1772,6 +1805,7 @@ async function syncNow(manual) {
         // Samma matlagning pågår på annan enhet: ta in bockar, steg och chatt
         applySession(ss); keepScroll(renderStage); renderChat(true);
       } else if (['book', 'home', 'settings'].includes(S.route.view)) renderStage();
+      if (applyRemoteChat()) { renderChat(true); if ($('#app').dataset.chat !== 'open') $('#chatDot').hidden = false; }
     }
     if (manual) toast('Kokboken är synkad');
   } catch (e) {
@@ -1782,7 +1816,7 @@ async function syncNow(manual) {
 function canon(d) {
   const recipes = (d.recipes || []).slice().sort((a, b) => a.id.localeCompare(b.id)).map(r => r.id + '|' + (r.updatedAt || ''));
   const memory = (d.memory || []).map(m => m.id + '|' + (m.updatedAt || '')).sort();
-  return JSON.stringify([d.textUpdatedAt, recipes, memory, Object.keys(d.deleted || {}).sort(), d.session?.updatedAt || '', (d.history || []).map(h => h.id + '|' + h.viewedAt)]);
+  return JSON.stringify([d.textUpdatedAt, recipes, memory, Object.keys(d.deleted || {}).sort(), d.session?.updatedAt || '', d.chatSync?.updatedAt || '', (d.history || []).map(h => h.id + '|' + h.viewedAt)]);
 }
 function mergeData(remote) {
   const L = S.data, R = Object.assign(freshData(), remote || {});
@@ -1797,6 +1831,7 @@ function mergeData(remote) {
   if ((R.textUpdatedAt || '') > (L.textUpdatedAt || '')) { L.instructions = R.instructions; L.profile = R.profile; if (R.prefs) L.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), L.prefs || {}, R.prefs); L.textUpdatedAt = R.textUpdatedAt; }
   L.deleted = deleted;
   if (R.session && (!L.session || (R.session.updatedAt || '') > (L.session.updatedAt || ''))) L.session = R.session;
+  if (R.chatSync && (!L.chatSync || (R.chatSync.updatedAt || '') > (L.chatSync.updatedAt || ''))) L.chatSync = R.chatSync;
   const hm = new Map();
   [...(R.history || []), ...(L.history || [])].forEach(h => { const k = recipeKey(h.recipe); const e = hm.get(k); if (!e || (h.viewedAt || '') > (e.viewedAt || '')) hm.set(k, h); });
   L.history = [...hm.values()].sort((a, b) => (b.viewedAt || '').localeCompare(a.viewedAt || '')).slice(0, 30);
