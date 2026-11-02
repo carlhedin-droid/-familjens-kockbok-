@@ -371,7 +371,7 @@ function addHistory(r, savedId) {
   const key = recipeKey(r);
   S.data.history = (S.data.history || []).filter(h => recipeKey(h.recipe) !== key);
   S.data.history.unshift({ id: uid(), recipe: r, savedId: savedId || null, viewedAt: now() });
-  S.data.history = S.data.history.slice(0, 15);
+  S.data.history = S.data.history.slice(0, 30);
   saveData();
 }
 function applySession(ss) {
@@ -919,7 +919,7 @@ function viewHome() {
   const t = todayTime();
   const gear = d.weekend && P.weekendGear ? ['Kolgrill', 'Sous vide', 'Rökskåp', 'Pizzaugn'].filter(x => P.equipment.includes(x) || P.customEquipment.includes(x)).slice(0, 2).map(x => x.toLowerCase()) : [];
   const hint = `${d.manual ? (d.weekend ? 'Helgläge' : 'Vardagsläge') : `Det är <strong>${d.name}</strong> – ${d.weekend ? 'helg' : 'vardag'}`}. Tidsram <strong>${t.label}</strong>${d.weekend ? (gear.length ? `, gärna ${gear.join(' eller ')}` : ', gärna ett projekt') : ', lite disk'}. <button class="linkish" data-status>Ändra</button>`;
-  const hist = (S.data.history || []).slice(0, 6);
+  const hist = (S.data.history || []).slice(0, 8);
   if (S.busy === 'flow') {
     return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Souschefen tänker…</span></div></section>`;
   }
@@ -940,6 +940,12 @@ function viewHome() {
         <button class="btn" type="submit" id="askBtn">Ge oss förslag</button>
       </div>
     </form>
+    ${hist.length || S.current.suggestions ? `<div class="recent-strip">
+      <div class="strip-head"><h2>Senaste recept</h2>${hist.length ? `<button class="linkish" data-showhist>Visa alla (${(S.data.history || []).length})</button>` : ''}</div>
+      <div class="strip">
+        ${S.current.suggestions ? `<button class="mini-card sugg-card" data-go="suggestions"><span class="mc-title">Senaste förslagen</span><span class="mc-sub">${S.current.suggestions.length} rätter</span></button>` : ''}
+        ${hist.map(h => `<button class="mini-card" data-hist="${h.id}"><span class="mc-flag">${flags(h.recipe)}</span><span class="mc-title">${esc(h.recipe.title)}</span><span class="mc-sub">${esc(histDate(h))}${histSaved(h) ? ' · i kokboken' : ''}</span></button>`).join('')}
+      </div></div>` : ''}
     <div class="quick">
       ${[
         d.weekend ? 'Helgprojekt ikväll' : `Snabb middag på ${todayTime().label}`,
@@ -949,14 +955,6 @@ function viewHome() {
         'Laga om en favorit från kokboken',
       ].map(q => `<button class="chip" data-quick="${esc(q)}">${esc(q)}</button>`).join('')}
     </div>
-    ${S.current.recipe || S.current.suggestions ? `<div class="row" style="margin:-20px 0 32px">
-      ${S.current.recipe ? `<button class="ghost" data-go="recipe">Fortsätt med ${esc(S.current.recipe.title)}</button>` : ''}
-      ${S.current.suggestions ? `<button class="ghost" data-go="suggestions">Senaste förslagen</button>` : ''}</div>` : ''}
-    ${hist.length ? `<h2>Senaste recept</h2><div class="recent">${hist.map(h => `<button class="book-row" data-hist="${h.id}">
-      <h3><span class="origin">${flags(h.recipe)}</span>${esc(h.recipe.title)}</h3>
-      <span class="rt">${h.savedId && S.data.recipes.some(x => x.id === h.savedId) ? '<span title="Finns i kokboken">📖</span>' : ''}</span>
-      <span class="sub">${esc([h.recipe.origin, h.recipe.time, new Date(h.viewedAt).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })].filter(Boolean).join(', '))}</span>
-    </button>`).join('')}</div>` : ''}
   </section>`;
 }
 function potSvg() {
@@ -1104,7 +1102,33 @@ function bookRow(r) {
     ${r.notes ? `<span class="note-snip">${esc(r.notes.slice(0, 140))}${r.notes.length > 140 ? '…' : ''}</span>` : ''}
   </button>`;
 }
+function histDate(h) { return new Date(h.viewedAt).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' }); }
+function histSaved(h) { return h.savedId && S.data.recipes.some(x => x.id === h.savedId); }
+function histRow(h) {
+  return `<button class="book-row" data-hist="${h.id}">
+    <h3><span class="origin">${flags(h.recipe)}</span>${esc(h.recipe.title)}</h3>
+    <span class="rt">${histSaved(h) ? '<span class="saved-badge">I kokboken</span>' : ''}</span>
+    <span class="sub">${esc([histDate(h), h.recipe.origin, h.recipe.time].filter(Boolean).join(' · '))}${h.recipe.source ? ' · ' + esc((() => { try { return new URL(h.recipe.source).hostname.replace(/^www\./, ''); } catch { return ''; } })()) : ''}</span>
+  </button>`;
+}
 function viewBook() {
+  const tab = S.bookTab || 'saved';
+  const hist = S.data.history || [];
+  const tabs = `<div class="book-tabs" role="tablist">
+    <button role="tab" aria-selected="${tab === 'saved'}" data-booktab="saved">Sparade <span>${S.data.recipes.length}</span></button>
+    <button role="tab" aria-selected="${tab === 'hist'}" data-booktab="hist">Senaste <span>${hist.length}</span></button></div>`;
+  if (tab === 'hist') {
+    const q = S.bookQuery.toLowerCase();
+    const list = q ? hist.filter(h => [h.recipe.title, h.recipe.origin, ...(h.recipe.ingredients || []).map(i => i.name)].join(' ').toLowerCase().includes(q)) : hist;
+    return `<section>
+    <div class="book-head"><h1>Kokboken</h1>
+      <input class="search" id="bookSearch" type="search" placeholder="Sök bland senaste recepten" value="${esc(S.bookQuery)}" aria-label="Sök bland senaste recepten"></div>
+    ${tabs}
+    <p class="muted" style="margin:0 0 12px">Alla recept ni tittat på de senaste veckorna, även de som inte är sparade. Synkas mellan era enheter.</p>
+    ${hist.length === 0 ? `<div class="empty"><h2>Ingen historik än</h2><p>Recept ni öppnar hamnar här automatiskt.</p><button class="btn" data-go="home">Till start</button></div>`
+      : list.length ? `<div class="book-list">${list.map(histRow).join('')}</div>` : `<p class="muted">Inget matchar.</p>`}
+  </section>`;
+  }
   const q = S.bookQuery.toLowerCase();
   let list = S.data.recipes.slice();
   if (S.bookFilter === 'favoriter') list = list.filter(r => (r.rating || 0) >= 4);
@@ -1116,6 +1140,7 @@ function viewBook() {
   return `<section>
     <div class="book-head"><h1>Kokboken</h1>
       <input class="search" id="bookSearch" type="search" placeholder="Sök rätt, råvara eller anteckning" value="${esc(S.bookQuery)}" aria-label="Sök i kokboken"></div>
+    ${tabs}
     <div class="filters">${f('alla', 'Alla')}${f('favoriter', 'Favoriter')}${f('vardag', 'Vardag')}${f('helg', 'Helg')}</div>
     ${S.data.recipes.length === 0
       ? `<div class="empty"><h2>Kokboken är tom</h2><p>Be souschefen om ett recept och tryck på <strong>Spara i kokboken</strong>. Betyg och anteckningar hjälper souschefen att lära sig vad ni gillar.</p><button class="btn" data-go="home">Till start</button></div>`
@@ -1408,6 +1433,9 @@ $('#stage').addEventListener('click', async e => {
   }
   const fl = t.closest('[data-filter]');
   if (fl) { S.bookFilter = fl.dataset.filter; renderStage(); return; }
+  const bt = t.closest('[data-booktab]');
+  if (bt) { S.bookTab = bt.dataset.booktab; renderStage(); return; }
+  if (t.closest('[data-showhist]')) { S.bookTab = 'hist'; S.bookQuery = ''; go('book'); return; }
 
   // Preferenser (sparas direkt)
   const pt = t.closest('[data-ptoggle]');
@@ -1706,7 +1734,7 @@ function mergeData(remote) {
   if (R.session && (!L.session || (R.session.updatedAt || '') > (L.session.updatedAt || ''))) L.session = R.session;
   const hm = new Map();
   [...(R.history || []), ...(L.history || [])].forEach(h => { const k = recipeKey(h.recipe); const e = hm.get(k); if (!e || (h.viewedAt || '') > (e.viewedAt || '')) hm.set(k, h); });
-  L.history = [...hm.values()].sort((a, b) => (b.viewedAt || '').localeCompare(a.viewedAt || '')).slice(0, 15);
+  L.history = [...hm.values()].sort((a, b) => (b.viewedAt || '').localeCompare(a.viewedAt || '')).slice(0, 30);
   migrateData();
 }
 async function copyShareLink() {
