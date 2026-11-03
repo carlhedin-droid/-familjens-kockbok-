@@ -656,7 +656,7 @@ async function callModel(onProgress = () => {}) {
     if (!res.ok) throw new Error(j.error?.message || `Claude svarade ${res.status}`);
     return (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
   }
-  const key = S.settings.geminiKey.trim();
+  const key = ((window.Cloud?.active() && Cloud.geminiKey()) || S.settings.geminiKey || '').trim();
   if (!key) throw new Error('NOKEY');
   const lastUser = [...msgs].reverse().find(m => m.role === 'user');
   const hasLink = /https?:\/\/\S+/.test(lastUser?.text || '');
@@ -995,7 +995,9 @@ function renderStage() {
   else if (v === 'book') st.innerHTML = viewBook();
   else if (v === 'settings') st.innerHTML = viewSettings();
   else if (v === 'welcome') st.innerHTML = viewWelcome();
-  document.getElementById('app').classList.toggle('onboarding', v === 'welcome');
+  else if (v === 'login' && window.Cloud) st.innerHTML = Cloud.viewLogin();
+  else if (v === 'family' && window.Cloud) st.innerHTML = Cloud.viewFamily();
+  document.getElementById('app').classList.toggle('onboarding', ['welcome', 'login', 'family'].includes(v));
   bindStage();
 }
 
@@ -1318,14 +1320,14 @@ function viewWelcome() {
     <h1>Välkommen till Souschefen</h1>
     <p class="w-lead">Berätta vad ni har hemma, eller fota kylen, så föreslår souschefen middagar och skriver receptet efter er familj. Under matlagningen kan ni ställa frågor, och era favoriter sparas i kokboken.</p>
     <p>Det tar ungefär fem minuter att komma igång. Allt kan ändras senare under Inställningar.</p>
-    <p class="hint">Har ni redan Souschefen på en annan enhet? Öppna i stället länken från <em>Inställningar → Koppling → Kopiera länk till annan enhet</em> där.</p>`;
+    ${window.Cloud?.configured() ? '' : '<p class="hint">Har ni redan Souschefen på en annan enhet? Öppna i stället länken från <em>Inställningar → Koppling → Kopiera länk till annan enhet</em> där.</p>'}`;
   else if (k === 1) body = `
     <h1>Koppla souschefen</h1>
     <p class="w-lead">Souschefen använder Googles AI Gemini. Ni behöver en egen gratis nyckel, och det kostar inget.</p>
     <ol class="w-steps"><li>Öppna <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> och logga in med ert Google-konto.</li><li>Tryck på <strong>Create API key</strong> och kopiera nyckeln.</li><li>Klistra in den här:</li></ol>
-    <div class="field"><input id="geminiKey" type="password" autocomplete="off" value="${esc(s.geminiKey)}" placeholder="Klistra in nyckeln"></div>
+    <div class="field"><input id="geminiKey" type="password" autocomplete="off" value="${esc(s.geminiKey || (window.Cloud?.geminiKey() || ''))}" placeholder="Klistra in nyckeln"></div>
     <div class="row"><button class="ghost" data-wtest>Testa nyckeln</button>${S.aiStatus ? `<strong class="status-line" style="display:inline">${esc(S.aiStatus)}</strong>` : ''}</div>
-    <p class="hint">Nyckeln sparas bara på den här enheten. På gratisnivån får Google använda frågorna för att förbättra sina tjänster.</p>`;
+    <p class="hint">${window.Cloud?.active() ? 'Nyckeln sparas i familjens konto och gäller alla era enheter.' : 'Nyckeln sparas bara på den här enheten.'} På gratisnivån får Google använda frågorna för att förbättra sina tjänster.</p>`;
   else if (k === 2) body = `
     <h1>Hushållet</h1>
     <div class="field"><label>Hur många portioner lagar ni oftast?</label>
@@ -1397,7 +1399,7 @@ ${prefsCards()}
       <div class="row"><input id="memNew" class="search" placeholder="T.ex. Vi älskar sambal" style="max-width:none"><button class="ghost" data-memadd>Lägg till</button></div>
     </div>
 
-    <div class="card">
+    ${window.Cloud?.configured() ? Cloud.accountCard() : `<div class="card">
       <h2>Koppling</h2>
       <p>Görs en gång per enhet. Nycklarna sparas bara i webbläsaren.</p>
       <div class="field"><label for="${keyField}">${p === 'claude' ? 'Claude-nyckel' : 'Gemini-nyckel (gratis)'}</label>
@@ -1409,7 +1411,7 @@ ${prefsCards()}
       <div class="row"><button class="btn" data-connect>Spara och testa</button>
         ${s[keyField] ? `<button class="ghost" data-sharelink>Kopiera länk till annan enhet</button>` : ''}</div>
       ${s[keyField] ? `<p class="hint muted" style="margin:10px 0 0;font-size:14px">Öppna länken på mobilen eller plattan så kopplas den automatiskt. Länken innehåller nycklarna – skicka den bara till er själva.</p>` : ''}
-    </div>
+    </div>`}
 
     <details class="card adv">
       <summary><h2>Avancerat</h2></summary>
@@ -1485,13 +1487,13 @@ $('#stage').addEventListener('click', async e => {
   if (chk) { S.checked[chk.dataset.check] = chk.checked; const row = chk.closest('.ing'); row.classList.toggle('checked', chk.checked); updateCount(); saveSession(); return; }
   const wn = t.closest('[data-wnav]');
   if (wn) {
-    if ((S.wStep || 0) === 1) { const el = document.getElementById('geminiKey'); if (el) { S.settings.geminiKey = el.value.trim(); saveSettings(); } }
+    if ((S.wStep || 0) === 1) { const el = document.getElementById('geminiKey'); if (el) { S.settings.geminiKey = el.value.trim(); saveSettings(); if (window.Cloud?.active() && S.settings.geminiKey) Cloud.saveKey(S.settings.geminiKey); } }
     const next = (S.wStep || 0) + +wn.dataset.wnav;
     if (next >= W_STEPS.length) { finishWelcome(); return; }
     S.wStep = Math.max(0, next); renderStage(); $('#stage').scrollTop = 0; return;
   }
   if (t.closest('[data-wskip]')) { finishWelcome(); return; }
-  if (t.closest('[data-wtest]')) { const el = document.getElementById('geminiKey'); S.settings.geminiKey = el.value.trim(); saveSettings(); S.aiStatus = 'Testar…'; renderStage(); testAI().then(r => { S.aiStatus = r; if (S.route.view === 'welcome') renderStage(); }); return; }
+  if (t.closest('[data-wtest]')) { const el = document.getElementById('geminiKey'); S.settings.geminiKey = el.value.trim(); saveSettings(); if (window.Cloud?.active() && S.settings.geminiKey) Cloud.saveKey(S.settings.geminiKey); S.aiStatus = 'Testar…'; renderStage(); testAI().then(r => { S.aiStatus = r; if (S.route.view === 'welcome') renderStage(); }); return; }
   if (t.closest('[data-showwelcome]')) { S.wStep = 0; go('welcome'); return; }
   const rp = t.closest('[data-rport]');
   if (rp) { const r = S.current.recipe; const n = Math.max(1, Math.min(24, portionsFor(r) + +rp.dataset.rport)); S.portions = { title: r.title, n }; keepScroll(renderStage); saveSession(); return; }
@@ -1736,6 +1738,7 @@ async function updateWakeLock() {
 /* ============ Synk via GitHub Gist ============ */
 function setSync(state, title = '') { S.sync.state = state; const el = $('#sync'); el.textContent = state; el.title = title; }
 function scheduleSync() {
+  if (window.Cloud?.active()) { Cloud.queueWrite(); return; }
   if (!S.settings.ghToken || !S.settings.gistId) return;
   clearTimeout(S.sync.timer); S.sync.timer = setTimeout(() => syncNow(), 1500);
 }
@@ -1746,7 +1749,7 @@ function gh(path, opts = {}) {
 }
 async function testAI() {
   const p = S.settings.provider;
-  if (!S.settings[p === 'claude' ? 'claudeKey' : 'geminiKey']) return 'Ingen nyckel ännu';
+  if (!S.settings[p === 'claude' ? 'claudeKey' : 'geminiKey'] && !(p === 'gemini' && window.Cloud?.geminiKey())) return 'Ingen nyckel ännu';
   const sysBackup = S.chat; S.chat = [{ role: 'user', text: 'Test: svara bara med reply "OK".' }];
   try { await callModel(); return '✓ Souschefen svarar'; }
   catch (e) { return '✗ ' + (e.message === 'NOKEY' ? 'Ingen nyckel' : e.message); }
@@ -1781,7 +1784,20 @@ async function createGist() {
   S.settings.gistId = j.id; saveSettings(); setSync('Synkad'); toast('Delad kokbok skapad'); renderStage();
 }
 let syncing = false;
+function afterMerge() {
+  renderStatus();
+  const ss = S.data.session;
+  if (S.route.view === 'recipe' && ss && ss.id === S.current.sessionId && ss.device !== S.settings.deviceId) {
+    // Samma matlagning pågår på annan enhet: ta in bockar, steg och chatt
+    applySession(ss); keepScroll(renderStage); renderChat(true);
+  } else if (['book', 'home', 'settings'].includes(S.route.view)) {
+    const ae = document.activeElement;
+    if (!(ae && ae.matches && ae.matches('input, textarea') && $('#stage').contains(ae))) renderStage();
+  }
+  if (applyRemoteChat()) { renderChat(true); if ($('#app').dataset.chat !== 'open') $('#chatDot').hidden = false; }
+}
 async function syncNow(manual) {
+  if (window.Cloud?.active()) return;
   if (!S.settings.ghToken || !S.settings.gistId || syncing) return;
   syncing = true; setSync('Synkar…');
   try {
@@ -1803,15 +1819,7 @@ async function syncNow(manual) {
       if (!up.ok) { const e = await up.json().catch(() => ({})); throw new Error(e.message || up.status); }
     }
     setSync('Synkad', 'Senast ' + new Date().toLocaleTimeString('sv-SE'));
-    if (before !== merged) {
-      renderStatus();
-      const ss = S.data.session;
-      if (S.route.view === 'recipe' && ss && ss.id === S.current.sessionId && ss.device !== S.settings.deviceId) {
-        // Samma matlagning pågår på annan enhet: ta in bockar, steg och chatt
-        applySession(ss); keepScroll(renderStage); renderChat(true);
-      } else if (['book', 'home', 'settings'].includes(S.route.view)) renderStage();
-      if (applyRemoteChat()) { renderChat(true); if ($('#app').dataset.chat !== 'open') $('#chatDot').hidden = false; }
-    }
+    if (before !== merged) afterMerge();
     if (manual) toast('Kokboken är synkad');
   } catch (e) {
     setSync('Synk misslyckades', String(e.message || e));
@@ -1833,7 +1841,7 @@ function mergeData(remote) {
   const mem = new Map();
   [...(R.memory || []), ...(L.memory || [])].forEach(m => { const e = mem.get(m.id); mem.set(m.id, e ? newer(e, m) : m); });
   L.memory = [...mem.values()].sort((a, b) => (a.at || '').localeCompare(b.at || ''));
-  if ((R.textUpdatedAt || '') > (L.textUpdatedAt || '')) { L.instructions = R.instructions; L.profile = R.profile; if (R.prefs) L.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), L.prefs || {}, R.prefs); L.textUpdatedAt = R.textUpdatedAt; }
+  if (R.prefs && ((R.textUpdatedAt || '') > (L.textUpdatedAt || '') || (String(L.textUpdatedAt || '').startsWith('1970') && !String(R.textUpdatedAt || '').startsWith('1970')) || (String(L.textUpdatedAt || '').startsWith('1970') && String(R.textUpdatedAt || '').startsWith('1970') && !HAD_DATA))) { L.instructions = R.instructions; L.profile = R.profile; if (R.prefs) L.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), L.prefs || {}, R.prefs); L.textUpdatedAt = R.textUpdatedAt; }
   L.deleted = deleted;
   if (R.session && (!L.session || (R.session.updatedAt || '') > (L.session.updatedAt || ''))) L.session = R.session;
   if (R.chatSync && (!L.chatSync || (R.chatSync.updatedAt || '') > (L.chatSync.updatedAt || ''))) L.chatSync = R.chatSync;
@@ -1877,6 +1885,8 @@ applyTheme();
 renderStatus();
 if (HAD_DATA && !S.settings.onboarded) { S.settings.onboarded = true; saveSettings(); }
 if (S.settings.geminiKey && !S.settings.onboarded) { S.settings.onboarded = true; saveSettings(); }
-go(!S.settings.onboarded ? 'welcome' : S.current.recipe && LS.get('fk.lastView', '') === 'recipe' ? 'recipe' : 'home');
+function startView() { return !S.settings.onboarded ? 'welcome' : S.current.recipe && LS.get('fk.lastView', '') === 'recipe' ? 'recipe' : 'home'; }
+if (window.Cloud?.configured()) { Cloud.init(); go(Cloud.signedInHint() ? startView() : 'login'); }
+else go(startView());
 renderChat(true);
 syncNow();
