@@ -1888,7 +1888,7 @@ if (HAD_DATA && !S.settings.onboarded) { S.settings.onboarded = true; saveSettin
 if (S.settings.geminiKey && !S.settings.onboarded) { S.settings.onboarded = true; saveSettings(); }
 // Appen har flyttat till Cloudflare Pages. Skicka vidare från den gamla adressen –
 // men bara när inget osparat ligger kvar lokalt (annars: be om inloggning först så att datan följer med).
-const NEW_HOME = '';  // sätts när nya adressen är bekräftad
+const NEW_HOME = 'https://souschefen.pages.dev/';
 const OLD_HOST = !!NEW_HOME && location.hostname === 'carlhedin-droid.github.io';
 if (OLD_HOST) {
   let hasLocal = false, inCloud = false;
