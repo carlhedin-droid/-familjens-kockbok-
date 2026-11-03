@@ -155,6 +155,8 @@ window.Cloud = (() => {
     else if (['login', 'family'].includes(S.route.view)) go(startView());
     afterMerge(); renderStatus();
     queueWrite(0);
+    setTimeout(async () => { await flush(); try { localStorage.setItem('fk.cloudSynced', '1'); } catch { } }, 1200);
+    if (typeof OLD_HOST !== 'undefined' && OLD_HOST) setTimeout(async () => { await flush(); try { localStorage.setItem('fk.cloudSynced', '1'); } catch { } toast('Allt är sparat – flyttar till nya adressen'); setTimeout(() => location.replace(NEW_HOME), 1500); }, 1500);
   }
   function applyRemote() {
     const before = canon(S.data);
@@ -197,6 +199,7 @@ window.Cloud = (() => {
     const busy = !C.auth || (signedInHint() && C.user === null && !C.error);
     return `<section class="welcome">
       <div class="w-card login-card">
+        ${typeof movedNote === 'function' ? movedNote() : ''}
         <h1>Souschefen</h1>
         <p class="w-lead">Familjens kockcoach och kokbok. Logga in med ert Google-konto – samma kokbok, historik och chatt på alla era enheter.</p>
         ${busy ? `<p class="muted">Loggar in…</p>` : `<button class="btn google-btn" data-signin>

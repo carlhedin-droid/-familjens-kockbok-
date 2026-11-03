@@ -1,5 +1,7 @@
 # Souschefen
 
+Adress: https://souschefen.pages.dev/
+
 Familjens souschef och kokbok som webbapp. Fungerar på dator, mobil och platta och använder Google Gemini (gratis).
 
 - **Laga mat:** Beskriv vad ni har (eller fota kylen) och få 5–8 förslag med förklaring. Välj ett och få hela receptet.

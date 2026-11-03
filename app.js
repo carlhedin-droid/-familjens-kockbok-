@@ -1014,6 +1014,7 @@ function viewHome() {
     return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">Souschefen tänker…</span></div></section>`;
   }
   return `<section class="home">
+    ${movedNote()}
     ${sessionBanner()}
     <h1>Vad lagar vi idag?</h1>
     <p class="day-line">${hint}</p>
@@ -1885,6 +1886,18 @@ applyTheme();
 renderStatus();
 if (HAD_DATA && !S.settings.onboarded) { S.settings.onboarded = true; saveSettings(); }
 if (S.settings.geminiKey && !S.settings.onboarded) { S.settings.onboarded = true; saveSettings(); }
+// Appen har flyttat till Cloudflare Pages. Skicka vidare från den gamla adressen –
+// men bara när inget osparat ligger kvar lokalt (annars: be om inloggning först så att datan följer med).
+const NEW_HOME = 'https://souschefen.pages.dev/';
+const OLD_HOST = location.hostname === 'carlhedin-droid.github.io';
+if (OLD_HOST) {
+  let hasLocal = false, inCloud = false;
+  try { hasLocal = !!localStorage.getItem('fk.data'); inCloud = localStorage.getItem('fk.cloudSynced') === '1'; } catch { }
+  if (!hasLocal || inCloud) location.replace(NEW_HOME + location.search + location.hash);
+}
+function movedNote() {
+  return OLD_HOST ? `<div class="sync-note err"><strong>Souschefen har flyttat till <a href="${NEW_HOME}">souschefen.pages.dev</a>.</strong> Logga in här först och skapa eller gå med i er familj, så följer kokboken och historiken på den här enheten med. Sedan skickas du vidare automatiskt.</div>` : '';
+}
 function startView() { return !S.settings.onboarded ? 'welcome' : S.current.recipe && LS.get('fk.lastView', '') === 'recipe' ? 'recipe' : 'home'; }
 if (window.Cloud?.configured()) { Cloud.init(); go(Cloud.signedInHint() ? startView() : 'login'); }
 else go(startView());
