@@ -661,7 +661,8 @@ async function callModel(onProgress = () => {}) {
   const lastUser = [...msgs].reverse().find(m => m.role === 'user');
   const hasLink = /https?:\/\/\S+/.test(lastUser?.text || '');
   let schema = RESPONSE_SCHEMA, useTool = hasLink;
-  S.lastUrlFail = false;
+  S.lastUrlFail = false; S.lastCut = false;
+  let cutoffs = 0, bestPartial = '', lastFinish = '';
   const mkBody = thinking => JSON.stringify({
     ...(useTool ? { tools: [{ url_context: {} }] } : {}),
     systemInstruction: { parts: [{ text: sys }] },
@@ -682,31 +683,46 @@ async function callModel(onProgress = () => {}) {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: mkBody(thinking) });
       } catch (e) { throw new Error('Kunde inte nå Google (nätverksfel). Kontrollera internetuppkopplingen.'); }
       if (res.ok) {
-        if (model !== S.settings.geminiModel && !/överbelastad|kvot/.test(lastErr)) { S.settings.geminiModel = model; saveSettings(); }
+        if (!cutoffs && model !== S.settings.geminiModel && !/överbelastad|kvot/.test(lastErr)) { S.settings.geminiModel = model; saveSettings(); }
         const reader = res.body.getReader(); const dec = new TextDecoder();
         let buf = '', txt = '', finish = '', urlMeta = null;
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          let i;
-          while ((i = buf.indexOf('\n')) >= 0) {
-            const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
-            if (!line.startsWith('data:')) continue;
-            try {
-              const j = JSON.parse(line.slice(5));
-              const c = j.candidates?.[0];
-              (c?.content?.parts || []).forEach(p => { if (!p.thought && p.text) txt += p.text; });
-              if (c?.finishReason) finish = c.finishReason;
-              const um = c?.urlContextMetadata || c?.url_context_metadata;
-              if (um) urlMeta = um.urlMetadata || um.url_metadata || urlMeta;
-              onProgress(txt);
-            } catch { /* ofullständig rad */ }
+        const readLine = raw => {
+          const line = raw.trim();
+          if (!line.startsWith('data:')) return;
+          try {
+            const j = JSON.parse(line.slice(5));
+            const c = j.candidates?.[0];
+            (c?.content?.parts || []).forEach(p => { if (!p.thought && p.text) txt += p.text; });
+            if (c?.finishReason) finish = c.finishReason;
+            const um = c?.urlContextMetadata || c?.url_context_metadata;
+            if (um) urlMeta = um.urlMetadata || um.url_metadata || urlMeta;
+            onProgress(txt);
+          } catch { /* ofullständig rad */ }
+        };
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            let i;
+            while ((i = buf.indexOf('\n')) >= 0) { readLine(buf.slice(0, i)); buf = buf.slice(i + 1); }
           }
+          readLine(buf + dec.decode());  // sista raden kan sakna radbrytning
+        } catch (e) { console.warn('Gemini: strömmen bröts', model, e); }  // t.ex. skärmen låstes eller nätet föll bort
+        // Svar som tog slut för tidigt: prova igen i stället för att visa en halv mening
+        if (!replyComplete(txt, finish, !useTool)) {
+          console.warn('Gemini: ofullständigt svar', model, finish || 'ingen finishReason', txt.length);
+          if (txt.length > bestPartial.length) bestPartial = txt;
+          lastFinish = finish;
+          cutoffs++;
+          if (cutoffs >= 3) break;
+          onProgress('', 'Svaret bröts – provar igen…');
+          if (cutoffs === 1) continue;
+          break;  // andra gången: byt modell
         }
+        S.lastUrlFail = false;
         if (useTool && Array.isArray(urlMeta) && urlMeta.length && !urlMeta.some(u => /SUCCESS/i.test(u.urlRetrievalStatus || u.url_retrieval_status || ''))) S.lastUrlFail = true;
         if (hasLink && !useTool) S.lastUrlFail = true;
-        if (!txt) throw new Error('Tomt svar från Gemini (' + (finish || 'okänd orsak') + ')');
         return txt;
       }
       const j = await res.json().catch(() => ({}));
@@ -729,6 +745,12 @@ async function callModel(onProgress = () => {}) {
       if (res.status === 403) throw new Error('Nyckeln saknar behörighet (403): ' + msg + ' – skapa en ny nyckel i AI Studio.');
       throw new Error(lastErr);
     }
+    if (cutoffs >= 3) break;
+  }
+  if (cutoffs) {
+    if (!bestPartial) throw new Error('Tomt svar från Gemini (' + (lastFinish || 'okänd orsak') + ')');
+    S.lastCut = true;
+    return bestPartial;
   }
   throw new Error('Googles gratismodeller är överbelastade just nu (' + lastErr + '). Vänta en minut och försök igen.');
 }
@@ -742,6 +764,13 @@ function mergeRoles(msgs) {
   }
   while (out.length && out[0].role !== 'user') out.shift();
   return out;
+}
+// Helt svar = modellen sa STOP och (när JSON krävs) texten går att tolka
+function replyComplete(txt, finish, needJson) {
+  if (!txt || finish !== 'STOP') return false;
+  if (!needJson) return true;
+  const t = txt.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  try { JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1)); return true; } catch { return false; }
 }
 function parseReply(raw) {
   const t = String(raw ?? '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
@@ -806,6 +835,7 @@ function showProgress(acc, override) {
   const st = document.getElementById('stageStatus'); if (st) st.textContent = what;
   const live = document.getElementById('liveReply');
   const r = partialReply(acc);
+  if (live && override && !r) { live.classList.add('typing'); live.innerHTML = '<i></i><i></i><i></i>'; }
   if (live && r) { live.classList.remove('typing'); live.innerHTML = md(r); const log = $('#chatLog'); log.scrollTop = log.scrollHeight; }
 }
 // flow = receptval från huvudfönstret (knappar/startsida). Syns inte i chatten, men kocken minns det.
@@ -851,6 +881,7 @@ async function send(text, image, opts = {}) {
       go('suggestions', { keepChat: true });
     }
     const learned = (Array.isArray(o.learn) ? o.learn : []).map(s => cleanReply(s)).filter(x => x.length > 3);
+    if (S.lastCut && !recipe && !sugg && msg.text) { msg.text = msg.text.trimEnd() + '…'; msg.cut = true; }
     if (!recipe && !sugg && !msg.text) { msg.text = 'Souschefen gav inget svar på det. Försök formulera om frågan.'; msg.placeholder = true; }
     if (learned.length) {
       const existing = new Set(S.data.memory.filter(m => !m.deleted).map(m => m.text.toLowerCase()));
@@ -860,7 +891,7 @@ async function send(text, image, opts = {}) {
     }
     // Svar som föreslår (eller påstår) en ändring utan att skicka receptet: erbjud knapp
     // Varje svar medan ett recept är öppet får en knapp – starkare om souschefen föreslår/påstår en ändring
-    if (!recipe && !sugg && !flow && S.route.view === 'recipe' && S.current.recipe && !msg.placeholder) {
+    if (!recipe && !sugg && !flow && S.route.view === 'recipe' && S.current.recipe && !msg.placeholder && !msg.cut) {
       const claim = CLAIM_RE.test(msg.text), bad = !!o.recipe;
       msg.offer = true;
       msg.offerStrong = !!(o.offerUpdate || claim || bad);
@@ -956,6 +987,7 @@ function renderChat(scroll) {
       if (m.offer && !m.applied) extra += m.offerStrong || m.offerStrong === undefined
         ? `<div class="offer">${m.notApplied ? '<span>Receptet är inte ändrat än.</span>' : ''}<button class="btn small" data-apply="${i}">Uppdatera receptet</button><button class="ghost small" data-noapply="${i}">Nej tack</button></div>`
         : `<div class="offer weak"><button class="linkish" data-apply="${i}">Uppdatera receptet utifrån svaret</button></div>`;
+      if (m.cut) extra += `<div class="offer weak"><span>Svaret bröts av.</span> <button class="linkish" data-retry="${i}">Försök igen</button></div>`;
       if (m.learned?.length) extra += `<div class="learned">Souschefen kommer ihåg: ${m.learned.map(esc).join(' · ')}</div>`;
       return `<div class="msg assistant">${md(m.text) || ''}${extra}</div>`;
     }).join('');
@@ -969,6 +1001,8 @@ $('#chatLog').addEventListener('click', e => {
   const a = e.target.closest('[data-ask]');
   if (a) { send(a.dataset.ask); return; }
   const ap = e.target.closest('[data-apply]');
+  const rt = e.target.closest('[data-retry]');
+  if (rt) { const m = S.chat[+rt.dataset.retry]; if (m) m.cut = false; send('Ditt förra svar bröts av mitt i. Skriv hela svaret igen.', null, { display: '↻ Försök igen' }); return; }
   if (ap) { const m = S.chat[+ap.dataset.apply]; if (m) { m.applied = true; } send('Ja, uppdatera receptet enligt ditt senaste svar. Skicka HELA det ändrade receptet i "recipe" (alla ingredienser och alla steg).', null, { display: '✓ Uppdatera receptet' }); return; }
   const na = e.target.closest('[data-noapply]');
   if (na) { const m = S.chat[+na.dataset.noapply]; if (m) m.applied = true; saveChat(); renderChat(); }
