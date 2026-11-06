@@ -12,7 +12,7 @@ window.Cloud = (() => {
   const clean = x => JSON.parse(JSON.stringify(x ?? null));
   const configured = () => !!window.FIREBASE_CONFIG;
   const SDK = 'https://cdn.jsdelivr.net/npm/firebase@12.19.0/';
-  const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Kunde inte ladda ' + src)); document.head.appendChild(s); });
+  const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error(L('Kunde inte ladda ', 'Could not load ') + src)); document.head.appendChild(s); });
   const active = () => configured() && !!C.fid && C.ready;
   const famRef = () => C.db.collection('families').doc(C.fid);
   const host = () => location.origin + location.pathname;
@@ -20,7 +20,7 @@ window.Cloud = (() => {
   async function init() {
     try {
       if (!window.firebase) for (const f of ['app', 'auth', 'firestore']) await loadScript(`${SDK}firebase-${f}-compat.js`);
-    } catch (e) { C.error = e.message + '. Kontrollera internetuppkopplingen.'; if (S.route.view === 'login') renderStage(); return; }
+    } catch (e) { C.error = e.message + L('. Kontrollera internetuppkopplingen.', '. Check your internet connection.'); if (S.route.view === 'login') renderStage(); return; }
     firebase.initializeApp(window.FIREBASE_CONFIG);
     C.auth = firebase.auth();
     C.db = firebase.firestore();
@@ -46,15 +46,15 @@ window.Cloud = (() => {
       const code = (() => { try { return sessionStorage.getItem('fk.join'); } catch { return null; } })();
       if (code) { await join(code); return; }
       go('family');
-    } catch (e) { C.error = 'Kunde inte läsa kontot: ' + (e.message || e); go('family'); }
+    } catch (e) { C.error = L('Kunde inte läsa kontot: ', 'Could not read the account: ') + (e.message || e); go('family'); }
   }
 
   /* ---------- Inloggning ---------- */
   function authErr(e) {
     const c = e && e.code || '';
     if (/popup-closed|cancelled-popup/.test(c)) return '';
-    if (/unauthorized-domain/.test(c)) return 'Domänen är inte godkänd i Firebase (Authentication → Settings → Authorized domains).';
-    if (/network/.test(c)) return 'Ingen kontakt med Google. Kontrollera internetuppkopplingen.';
+    if (/unauthorized-domain/.test(c)) return L('Domänen är inte godkänd i Firebase (Authentication → Settings → Authorized domains).', 'The domain is not approved in Firebase (Authentication → Settings → Authorized domains).');
+    if (/network/.test(c)) return L('Ingen kontakt med Google. Kontrollera internetuppkopplingen.', 'No contact with Google. Check your internet connection.');
     return e.message || String(e);
   }
   async function signIn() {
@@ -68,7 +68,7 @@ window.Cloud = (() => {
     }
   }
   async function signOut() {
-    if (!confirm('Logga ut från Souschefen på den här enheten?')) return;
+    if (!confirm(L('Logga ut från Souschefen på den här enheten?', 'Sign out of Souschefen on this device?'))) return;
     detach(); C.fid = null; C.family = null; C.key = '';
     await C.auth.signOut();
   }
@@ -85,7 +85,7 @@ window.Cloud = (() => {
     try {
       const uid = C.user.uid;
       const ref = C.db.collection('families').doc();
-      await ref.set({ name: name || 'Vår familj', owner: uid, members: [uid], createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      await ref.set({ name: name || L('Vår familj', 'Our family'), owner: uid, members: [uid], createdAt: firebase.firestore.FieldValue.serverTimestamp() });
       const code = genCode();
       await C.db.collection('joinCodes').doc(code).set({ familyId: ref.id });
       await ref.update({ joinCode: code });
@@ -94,21 +94,21 @@ window.Cloud = (() => {
       await C.db.collection('users').doc(uid).set({ familyId: ref.id, email: C.user.email || '' });
       S.data.textUpdatedAt = now(); LS.set('fk.data', S.data);  // den här enhetens inställningar blir familjens
       attach(ref.id, { fresh: true });
-    } catch (e) { C.error = 'Kunde inte skapa familjen: ' + (e.message || e); renderStage(); }
+    } catch (e) { C.error = L('Kunde inte skapa familjen: ', 'Could not create the family: ') + (e.message || e); renderStage(); }
   }
   async function join(code) {
     C.error = '';
     code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     try {
       const jc = await C.db.collection('joinCodes').doc(code).get();
-      if (!jc.exists) { C.error = 'Hittar ingen familj med den koden.'; try { sessionStorage.removeItem('fk.join'); } catch { } go('family'); return; }
+      if (!jc.exists) { C.error = L('Hittar ingen familj med den koden.', 'No family found with that code.'); try { sessionStorage.removeItem('fk.join'); } catch { } go('family'); return; }
       const fid = jc.data().familyId;
       await C.db.collection('families').doc(fid).update({ members: firebase.firestore.FieldValue.arrayUnion(C.user.uid) });
       await C.db.collection('users').doc(C.user.uid).set({ familyId: fid, email: C.user.email || '' });
       try { sessionStorage.removeItem('fk.join'); } catch { }
-      toast('Du är med i familjen');
+      toast(L('Du är med i familjen', 'You have joined the family'));
       attach(fid);
-    } catch (e) { C.error = 'Kunde inte gå med: ' + (e.message || e); go('family'); }
+    } catch (e) { C.error = L('Kunde inte gå med: ', 'Could not join: ') + (e.message || e); go('family'); }
   }
 
   /* ---------- Realtidssynk ---------- */
@@ -148,7 +148,7 @@ window.Cloud = (() => {
     C.ready = true;
     mergeData(remoteObject());
     LS.set('fk.data', S.data);
-    setSync('Synkad', 'Realtid');
+    setSync('Synkad', L('Realtid', 'Real time'));
     // Nya familjer utan egna inställningar får introduktionen
     if (opts.fresh && !HAD_DATA && !S.settings.onboarded) { go('welcome'); }
     else if (!opts.fresh && !S.settings.onboarded) { S.settings.onboarded = true; saveSettings(); go(startView()); }
@@ -156,13 +156,13 @@ window.Cloud = (() => {
     afterMerge(); renderStatus();
     queueWrite(0);
     setTimeout(async () => { await flush(); try { localStorage.setItem('fk.cloudSynced', '1'); } catch { } }, 1200);
-    if (typeof OLD_HOST !== 'undefined' && OLD_HOST) setTimeout(async () => { await flush(); try { localStorage.setItem('fk.cloudSynced', '1'); } catch { } toast('Allt är sparat – flyttar till nya adressen'); setTimeout(() => location.replace(NEW_HOME), 1500); }, 1500);
+    if (typeof OLD_HOST !== 'undefined' && OLD_HOST) setTimeout(async () => { await flush(); try { localStorage.setItem('fk.cloudSynced', '1'); } catch { } toast(L('Allt är sparat – flyttar till nya adressen', 'Everything is saved – moving to the new address')); setTimeout(() => location.replace(NEW_HOME), 1500); }, 1500);
   }
   function applyRemote() {
     const before = canon(S.data);
     mergeData(remoteObject());
     LS.set('fk.data', S.data);
-    setSync('Synkad', 'Senast ' + new Date().toLocaleTimeString('sv-SE'));
+    setSync('Synkad', L('Senast ', 'Last ') + new Date().toLocaleTimeString(LOCALE()));
     if (canon(S.data) !== before) afterMerge();
     queueWrite();
   }
@@ -185,7 +185,7 @@ window.Cloud = (() => {
     (D.recipes || []).forEach(r => put('r:' + r.id, famRef().collection('recipes').doc(r.id), r));
     Object.keys(C.remote.recipes || {}).forEach(id => { if (!ids.has(id) && C.written['r:' + id] !== 'deleted') { batch.delete(famRef().collection('recipes').doc(id)); C.written['r:' + id] = 'deleted'; n++; } });
     if (!n) return;
-    try { setSync('Sparar…'); await batch.commit(); setSync('Synkad', 'Senast ' + new Date().toLocaleTimeString('sv-SE')); }
+    try { setSync('Sparar…'); await batch.commit(); setSync('Synkad', L('Senast ', 'Last ') + new Date().toLocaleTimeString(LOCALE())); }
     catch (e) { C.written = {}; err(e); }
   }
   async function saveKey(k) {
@@ -201,47 +201,48 @@ window.Cloud = (() => {
       <div class="w-card login-card">
         ${typeof movedNote === 'function' ? movedNote() : ''}
         <h1>Souschefen</h1>
-        <p class="w-lead">Familjens kockcoach och kokbok. Logga in med ert Google-konto – samma kokbok, historik och chatt på alla era enheter.</p>
-        ${busy ? `<p class="muted">Loggar in…</p>` : `<button class="btn google-btn" data-signin>
+        <div class="field">${langPicker()}</div>
+        <p class="w-lead">${L(`Familjens kockcoach och kokbok. Logga in med ert Google-konto – samma kokbok, historik och chatt på alla era enheter.`, `Your family's cooking coach and cookbook. Sign in with your Google account – same cookbook, history and chat on all your devices.`)}</p>
+        ${busy ? `<p class="muted">${L('Loggar in…', 'Signing in…')}</p>` : `<button class="btn google-btn" data-signin>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3Z"/><path fill="#fff" opacity=".85" d="M12 22c2.7 0 5-.9 6.6-2.5l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22Z"/><path fill="#fff" opacity=".7" d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9l3.3-2.6Z"/><path fill="#fff" opacity=".55" d="M12 6c1.5 0 2.8.5 3.8 1.5l2.8-2.8A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.8 9.4 6 12 6Z"/></svg>
-          Logga in med Google</button>`}
+          ${L('Logga in med Google', 'Sign in with Google')}</button>`}
         ${C.error ? `<p class="status-line" style="color:var(--sambal)">${esc(C.error)}</p>` : ''}
-        <p class="hint">Har ni fått en inbjudan från familjen? Logga in här, så kommer ni med automatiskt.</p>
+        <p class="hint">${L(`Har ni fått en inbjudan från familjen? Logga in här, så kommer ni med automatiskt.`, `Got an invitation from your family? Sign in here and you join automatically.`)}</p>
       </div></section>`;
   }
   function viewFamily() {
     const code = (() => { try { return sessionStorage.getItem('fk.join') || ''; } catch { return ''; } })();
     return `<section class="welcome">
       <div class="w-card">
-        <h1>Välkommen${C.user?.displayName ? ', ' + esc(C.user.displayName.split(' ')[0]) : ''}!</h1>
-        <p class="w-lead">Är ni först i familjen? Skapa er familj. Har någon redan skapat den – gå med med familjekoden.</p>
+        <h1>${L('Välkommen', 'Welcome')}${C.user?.displayName ? ', ' + esc(C.user.displayName.split(' ')[0]) : ''}!</h1>
+        <p class="w-lead">${L(`Är ni först i familjen? Skapa er familj. Har någon redan skapat den – gå med med familjekoden.`, `First in the family? Create your family. If someone already has, join with the family code.`)}</p>
         <div class="fam-cols">
-          <div class="day-col"><h3>Skapa ny familj</h3>
-            <div class="field"><label for="famName">Namn</label><input id="famName" placeholder="T.ex. Familjen Hedin" value="${esc(C.user?.displayName ? 'Familjen ' + C.user.displayName.split(' ').slice(-1)[0] : '')}"></div>
-            <button class="btn" data-famcreate>Skapa familj</button>
-            ${HAD_DATA ? `<p class="hint">Kokboken, historiken och inställningarna på den här enheten följer med.</p>` : ''}</div>
-          <div class="day-col"><h3>Gå med i familj</h3>
-            <div class="field"><label for="famCode">Familjekod</label><input id="famCode" placeholder="T.ex. K7QM-2XPA" value="${esc(code)}" autocapitalize="characters"></div>
-            <button class="ghost" data-famjoin>Gå med</button></div>
+          <div class="day-col"><h3>${L('Skapa ny familj', 'Create a new family')}</h3>
+            <div class="field"><label for="famName">${L('Namn', 'Name')}</label><input id="famName" placeholder="${L('T.ex. Familjen Hedin', 'E.g. The Smith family')}" value="${esc(C.user?.displayName ? L('Familjen ' + C.user.displayName.split(' ').slice(-1)[0], 'The ' + C.user.displayName.split(' ').slice(-1)[0] + ' family') : '')}"></div>
+            <button class="btn" data-famcreate>${L('Skapa familj', 'Create family')}</button>
+            ${HAD_DATA ? `<p class="hint">${L(`Kokboken, historiken och inställningarna på den här enheten följer med.`, `The cookbook, history and settings on this device come along.`)}</p>` : ''}</div>
+          <div class="day-col"><h3>${L('Gå med i familj', 'Join a family')}</h3>
+            <div class="field"><label for="famCode">${L('Familjekod', 'Family code')}</label><input id="famCode" placeholder="${L('T.ex.', 'E.g.')} K7QM-2XPA" value="${esc(code)}" autocapitalize="characters"></div>
+            <button class="ghost" data-famjoin>${L('Gå med', 'Join')}</button></div>
         </div>
         ${C.error ? `<p class="status-line" style="color:var(--sambal)">${esc(C.error)}</p>` : ''}
-        <p class="hint">Inloggad som ${esc(C.user?.email || '')}. <button class="linkish" data-signout>Byt konto</button></p>
+        <p class="hint">${L('Inloggad som', 'Signed in as')} ${esc(C.user?.email || '')}. <button class="linkish" data-signout>${L('Byt konto', 'Switch account')}</button></p>
       </div></section>`;
   }
   function prettyCode(c) { return c ? c.slice(0, 4) + '-' + c.slice(4) : ''; }
   function accountCard() {
     const F = C.family || {}, code = F.joinCode || '';
-    const ai = S.aiStatus || (C.key ? '' : 'Ingen nyckel ännu');
+    const ai = S.aiStatus || (C.key ? '' : L('Ingen nyckel ännu', 'No key yet'));
     return `<div class="card">
-      <h2>Konto och familj</h2>
-      <p>Inloggad som <strong>${esc(C.user?.email || '')}</strong>${F.name ? ` i <strong>${esc(F.name)}</strong>` : ''}${F.members ? ` (${F.members.length} ${F.members.length === 1 ? 'medlem' : 'medlemmar'})` : ''}. Allt sparas i familjens konto och syns direkt på alla era enheter.</p>
-      ${code ? `<div class="field"><label>Bjud in familjen</label>
-        <div class="row"><span class="fam-code">${prettyCode(code)}</span><button class="ghost" data-invite>Kopiera inbjudan</button></div>
-        <span class="hint">Den som öppnar inbjudan och loggar in med sitt Google-konto kommer med i familjen. Ni loggar in med samma konto på era egna enheter.</span></div>` : ''}
-      <div class="field"><label for="famKey">Gemini-nyckel för familjen</label>
-        <input id="famKey" type="password" autocomplete="off" value="${esc(C.key)}" placeholder="Klistra in nyckeln">
-        <span class="hint">Läggs in en gång och gäller alla i familjen. Hämtas gratis på <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.${ai ? ` <strong class="status-line">${esc(ai)}</strong>` : ''}</span></div>
-      <div class="row"><button class="btn" data-famkey>Spara och testa</button><button class="ghost" data-signout>Logga ut</button></div>
+      <h2>${L('Konto och familj', 'Account and family')}</h2>
+      <p>${L('Inloggad som', 'Signed in as')} <strong>${esc(C.user?.email || '')}</strong>${F.name ? ` ${L('i', 'in')} <strong>${esc(F.name)}</strong>` : ''}${F.members ? ` (${F.members.length} ${F.members.length === 1 ? L('medlem', 'member') : L('medlemmar', 'members')})` : ''}. ${L('Allt sparas i familjens konto och syns direkt på alla era enheter.', 'Everything is saved in the family account and shows up right away on all your devices.')}</p>
+      ${code ? `<div class="field"><label>${L('Bjud in familjen', 'Invite the family')}</label>
+        <div class="row"><span class="fam-code">${prettyCode(code)}</span><button class="ghost" data-invite>${L('Kopiera inbjudan', 'Copy invitation')}</button></div>
+        <span class="hint">${L(`Den som öppnar inbjudan och loggar in med sitt Google-konto kommer med i familjen. Ni loggar in med samma konto på era egna enheter.`, `Anyone who opens the invitation and signs in with their Google account joins the family. Use the same account on your own devices.`)}</span></div>` : ''}
+      <div class="field"><label for="famKey">${L('Gemini-nyckel för familjen', 'Gemini key for the family')}</label>
+        <input id="famKey" type="password" autocomplete="off" value="${esc(C.key)}" placeholder="${L('Klistra in nyckeln', 'Paste the key')}">
+        <span class="hint">${L('Läggs in en gång och gäller alla i familjen. Hämtas gratis på', 'Added once and works for everyone in the family. Get it for free at')} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.${ai ? ` <strong class="status-line">${esc(ai)}</strong>` : ''}</span></div>
+      <div class="row"><button class="btn" data-famkey>${L('Spara och testa', 'Save and test')}</button><button class="ghost" data-signout>${L('Logga ut', 'Sign out')}</button></div>
     </div>`;
   }
 
@@ -250,18 +251,18 @@ window.Cloud = (() => {
     const t = e.target;
     if (t.closest('[data-signin]')) { signIn(); return; }
     if (t.closest('[data-signout]')) { signOut(); return; }
-    if (t.closest('[data-famcreate]')) { const b = t.closest('button'); b.disabled = true; b.textContent = 'Skapar…'; await create(document.getElementById('famName').value.trim()); return; }
-    if (t.closest('[data-famjoin]')) { const b = t.closest('button'); b.disabled = true; b.textContent = 'Går med…'; await join(document.getElementById('famCode').value); return; }
+    if (t.closest('[data-famcreate]')) { const b = t.closest('button'); b.disabled = true; b.textContent = L('Skapar…', 'Creating…'); await create(document.getElementById('famName').value.trim()); return; }
+    if (t.closest('[data-famjoin]')) { const b = t.closest('button'); b.disabled = true; b.textContent = L('Går med…', 'Joining…'); await join(document.getElementById('famCode').value); return; }
     if (t.closest('[data-invite]')) {
       const code = C.family?.joinCode; if (!code) return;
-      const text = `Gå med i vår familj i Souschefen: ${host()}#join=${code}\n(Logga in med ditt Google-konto. Familjekod: ${prettyCode(code)})`;
-      try { await navigator.clipboard.writeText(text); toast('Inbjudan är kopierad'); } catch { prompt('Kopiera inbjudan:', text); }
+      const text = L(`Gå med i vår familj i Souschefen: ${host()}#join=${code}\n(Logga in med ditt Google-konto. Familjekod: ${prettyCode(code)})`, `Join our family in Souschefen: ${host()}#join=${code}\n(Sign in with your Google account. Family code: ${prettyCode(code)})`);
+      try { await navigator.clipboard.writeText(text); toast(L('Inbjudan är kopierad', 'The invitation is copied')); } catch { prompt(L('Kopiera inbjudan:', 'Copy the invitation:'), text); }
       return;
     }
     if (t.closest('[data-famkey]')) {
       const k = document.getElementById('famKey').value.trim();
-      S.aiStatus = 'Testar…'; renderStage();
-      try { await saveKey(k); } catch (er) { S.aiStatus = '✗ Kunde inte spara: ' + (er.message || er); renderStage(); return; }
+      S.aiStatus = L('Testar…', 'Testing…'); renderStage();
+      try { await saveKey(k); } catch (er) { S.aiStatus = L('✗ Kunde inte spara: ', '✗ Could not save: ') + (er.message || er); renderStage(); return; }
       S.aiStatus = await testAI(); renderStage();
     }
   });
