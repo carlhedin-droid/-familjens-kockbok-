@@ -732,3 +732,6 @@ a.howto { text-decoration: none; color: var(--ink); }
 .sb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .sb-chip { font-size: 13.5px; font-weight: 700; color: var(--pandan); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; background: var(--bg); }
 .sb-chip:hover { border-color: var(--pandan); }
+
+.price-row { display: flex; align-items: center; gap: 10px; }
+.price-row input { width: 120px; max-width: 40%; }
