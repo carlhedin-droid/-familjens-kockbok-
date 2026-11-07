@@ -1122,15 +1122,6 @@ function viewHome() {
         <button class="btn" type="submit" id="askBtn">${L('Ge oss förslag', 'Give us suggestions')}</button>
       </div>
     </form>
-    <div class="quick">
-      ${[
-        d.weekend ? L('Helgprojekt ikväll', 'Weekend project tonight') : L(`Snabb middag på ${todayTime().label}`, `Quick dinner in ${todayTime().label}`),
-        L(`Nyttigt men gott`, `Healthy but tasty`) + (S.data.prefs.healthWho ? ' – ' + healthLabel() : ''),
-        L('Vegetariskt med tydlig karaktär', 'Vegetarian with real character'),
-        L('Något malaysiskt eller singaporianskt', 'Something Malaysian or Singaporean'),
-        L('Laga om en favorit från kokboken', 'Cook a favourite from the cookbook again'),
-      ].map(q => `<button class="chip" data-quick="${esc(q)}">${esc(q)}</button>`).join('')}
-    </div>
     ${hist.length || S.current.suggestions ? `<div class="recent-strip">
       ${syncNote()}
       <div class="strip-head"><h2>${L(`Senaste recept`, `Recent recipes`)}</h2>${hist.length ? `<button class="linkish" data-showhist>${L('Visa alla', 'Show all')} (${(S.data.history || []).length})</button>` : ''}</div>

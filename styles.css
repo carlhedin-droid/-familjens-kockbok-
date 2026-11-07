@@ -589,7 +589,7 @@ details.adv[open] summary { margin-bottom: 8px; }
 .home .quick { margin: 14px 0 28px; }
 .home .quick .chip { font-size: 14.5px; padding: 7px 13px; font-weight: 600; color: var(--muted); }
 .home .quick .chip:hover { color: var(--ink); }
-.recent-strip { margin: 0 0 8px; }
+.recent-strip { margin: 26px 0 8px; }
 .strip-head h2 { font-size: 18px; }
 .mini-card { flex-basis: 170px; min-height: 0; padding: 10px 12px; gap: 3px; }
 .mc-title { font-size: 15px; }
