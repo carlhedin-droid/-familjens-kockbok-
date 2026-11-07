@@ -708,3 +708,15 @@ a.howto { text-decoration: none; color: var(--ink); }
   .r-jump button[data-jump="r-tips"] { flex: 0 0 auto; padding: 0 16px; }
 }
 .step > .step-title, .step > .step-text, .step > .step-tools { grid-column: 2; }
+
+.dr-look { margin: 0 0 6px; max-width: 64ch; }
+.drinks > .b-links { margin: 0 0 4px; }
+.dr-sub { font-size: 15px; margin: 14px 0 8px; color: var(--muted); font-family: var(--font-body); font-weight: 700; }
+
+.wine-find { margin: 12px 0 0; }
+.wine-err { color: var(--sambal); font-size: 14.5px; margin: 8px 0 0; }
+.b-rating { font-weight: 700; font-size: 15px; }
+.b-rating .muted { font-weight: 400; }
+.dr-sub .muted { font-weight: 400; font-size: 13.5px; }
+.bottle .tag { font-size: 12px; padding: 1px 7px; vertical-align: 1px; }
+.dr-na a { color: var(--pandan); font-weight: 700; text-underline-offset: 3px; }

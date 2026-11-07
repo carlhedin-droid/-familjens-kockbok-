@@ -57,7 +57,7 @@ function setLang(lang) {
   applyStaticLang(); renderStatus(); renderStage(); renderChat(); renderAttach(); tickTimers();
   const el = $('#sync'); if (el) el.textContent = tv(S.sync.state || '');
 }
-const ENGLISH_RULE = `- LANGUAGE: The app is set to English. Keep "howTo" search terms in English. Write everything the user sees in natural English: "reply", all recipe and suggestion text (title, origin, intro, step titles, overview, activeTime, ahead, ingredient names, groups and swaps, steps, health, tips, troubleshoot, serveWith, storage, drinks (style, why, kind, nonAlcoholic; keep bottle names as on the label), why, keyIngredients, equipment) and "learn". This overrides the Swedish examples above, and the instructions being in Swedish does not change it. Use g, kg, ml, l, tbsp and tsp, and "Easy", "Medium" or "Advanced" for "difficulty". Keep "tag" exactly VARDAG or HELG (VARDAG means weekday, HELG means weekend). Family notes may be in Swedish; understand them and answer in English. If a recipe on screen or at a link is in Swedish or another language, translate it when you send it. If information is missing: ask in "reply" and set suggestions/recipe to null.`;
+const ENGLISH_RULE = `- LANGUAGE: The app is set to English. Keep "howTo" search terms in English. Write everything the user sees in natural English: "reply", all recipe and suggestion text (title, origin, intro, step titles, overview, activeTime, ahead, ingredient names, groups and swaps, steps, health, tips, troubleshoot, serveWith, storage, drinks (style, lookFor, why, kind, nonAlcoholic; keep producer and bottle names as on the label, searchTerm as a Systembolaget search term), why, keyIngredients, equipment) and "learn". This overrides the Swedish examples above, and the instructions being in Swedish does not change it. Use g, kg, ml, l, tbsp and tsp, and "Easy", "Medium" or "Advanced" for "difficulty". Keep "tag" exactly VARDAG or HELG (VARDAG means weekday, HELG means weekend). Family notes may be in Swedish; understand them and answer in English. If a recipe on screen or at a link is in Swedish or another language, translate it when you send it. If information is missing: ask in "reply" and set suggestions/recipe to null.`;
 const langRule = () => FORMAT_RULES.replace('- Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.', L('- Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.', ENGLISH_RULE));
 
 /* ============ Standardtexter ============ */
@@ -289,8 +289,8 @@ const RESPONSE_SCHEMA = {
       troubleshoot: { type: 'ARRAY', items: { type: 'OBJECT', properties: { problem: S_STR, fix: S_STR }, required: ['problem', 'fix'] } },
       serveWith: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: S_STR, why: S_STRN }, required: ['name'] } },
       storage: { type: 'OBJECT', nullable: true, properties: { fridge: S_STRN, freezer: S_STRN, leftovers: S_STRN } },
-      drinks: { type: 'OBJECT', nullable: true, properties: { style: S_STR, nonAlcoholic: S_STRN,
-        bottles: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: S_STR, kind: S_STRN, country: S_STRN, price: S_STRN, why: S_STRN, nr: S_STRN }, required: ['name'] } } }, required: ['style'] } },
+      drinks: { type: 'OBJECT', nullable: true, properties: { style: S_STR, lookFor: S_STRN, searchTerm: S_STRN, nonAlcoholic: S_STRN,
+        bottles: { type: 'ARRAY', items: { type: 'OBJECT', properties: { producer: S_STRN, name: S_STR, kind: S_STRN, country: S_STRN, price: S_STRN, why: S_STRN }, required: ['name'] } } }, required: ['style'] } },
       required: ['title', 'ingredients', 'steps'] },
     learn: S_ARR,
     offerUpdate: { type: 'BOOLEAN' },
@@ -316,8 +316,8 @@ Du svarar inuti en app. Svara ALLTID med exakt ett JSON-objekt – ingen text f�
     "troubleshoot": [ { "problem": "Såsen är för tunn", "fix": "Sjud utan lock 5–10 min." } ],
     "serveWith": [ { "name": "Gurkraita", "why": "svalkar hettan" } ],
     "storage": { "fridge": "3 dagar", "freezer": "3 månader, utan grädden" | null, "leftovers": "Fyll wraps med resterna" | null },
-    "drinks": { "style": "Fruktigt rött med låga tanniner, t.ex. Pinot noir. Mjukar upp kryddorna.", "nonAlcoholic": "Mangolassi" | null,
-      "bottles": [ { "name": "Villa Wolf Pinot Noir", "kind": "Rött vin", "country": "Tyskland", "price": "ca 119 kr", "why": "Lätt och bärig", "nr": "7678801" | null } ] } | null
+    "drinks": { "style": "Fruktigt rött med låga tanniner. Kryddorna gör strävt vin bittert.", "lookFor": "Pinot noir eller Gamay, fyllighet 5–7, strävhet 3–5" | null, "searchTerm": "pinot noir" | null, "nonAlcoholic": "Mangolassi" | null,
+      "bottles": [ { "producer": "Villa Wolf", "name": "Pinot Noir", "kind": "Rött vin", "country": "Tyskland", "price": "ca 119 kr", "why": "Lätt och bärig" } ] } | null
   },
   "learn": [ "kort ny lärdom om familjens smak/vanor" ],
   "offerUpdate": false
@@ -332,7 +332,13 @@ Regler:
   - "howTo": för 1–3 tekniska moment som är lättare att se än att läsa (vika dumplings, filea fisk, temperera choklad, knåda deg): en kort YouTube-sökterm PÅ ENGELSKA. Annars null.
   - "troubleshoot": 2–3 vanliga problem för just den här rätten med konkret åtgärd.
   - "serveWith": 2–3 tillbehör som passar, med kort varför.
-  - "drinks": se Dryckestips i INSTÄLLNINGAR. "style": vilken typ av vin eller dryck som passar och varför (1–2 meningar). "bottles": 2–3 specifika flaskor ur Systembolagets ordinarie sortiment inom prisklassen, väletablerade och med gott rykte. Ange Systembolagets artikelnummer i "nr" BARA om du är säker, annars null – hitta aldrig på nummer. "nonAlcoholic": ett alkoholfritt alternativ (gärna en flaska från Systembolaget eller något hemgjort). Annars null.
+  - "drinks": se Dryckestips i INSTÄLLNINGAR. Rådet ska fungera även om en flaska saknas i butiken:
+    - "style": vilken typ av dryck som passar och VARFÖR, kopplat till rättens smaker (fett, syra, hetta, sötma, umami). 1–2 meningar.
+    - "lookFor": vad man letar efter på hyllan: druvor eller områden och Systembolagets smakklockor (fyllighet, strävhet, fruktsyra, sötma på skalan 1–12).
+    - "searchTerm": 1–3 ord att söka på hos Systembolaget för stilen, t.ex. "pinot noir" eller "riesling mosel".
+    - "bottles": 2–3 flaskor som funnits länge i Systembolagets fasta sortiment inom prisklassen. "producer" och "name" exakt som på etiketten, så att en sökning hittar flaskan. Hellre stora, välkända producenter än nischade viner. Hitta aldrig på flaskor; är du osäker, ge färre.
+    - "nonAlcoholic": ett alkoholfritt alternativ (gärna en flaska från Systembolaget eller något hemgjort).
+    Annars null.
   - "storage": hållbarhet i kyl, om den går att frysa (och hur), och en idé för resterna. null om det inte är relevant (t.ex. en dryck).
 - Varje steg har "title": 2–4 ord i imperativ som namnger momentet, t.ex. "Förbered grönsakerna", "Montera lasagnen", "Grädda i ugnen". Upprepa inte rubriken i "text". Även vid renskrivning.
 - I varje steg: skriv ut mängderna i texten och lista ingrediensernas id i "uses". "minutes" anges för steg med vänte-/tillagningstid.
@@ -919,8 +925,9 @@ function normalizeRecipe(r) {
   const st = r.storage && typeof r.storage === 'object' ? { fridge: str(r.storage.fridge), freezer: str(r.storage.freezer), leftovers: str(r.storage.leftovers) } : null;
   r.storage = st && (st.fridge || st.freezer || st.leftovers) ? st : null;
   const dr = r.drinks && typeof r.drinks === 'object' ? r.drinks : null;
-  r.drinks = dr && str(dr.style) ? { style: str(dr.style), nonAlcoholic: str(dr.nonAlcoholic),
-    bottles: arr(dr.bottles).filter(x => x && str(x.name)).slice(0, 4).map(x => ({ name: str(x.name), kind: str(x.kind), country: str(x.country), price: str(x.price), why: str(x.why), nr: /^\d{3,8}$/.test(String(x.nr || '').replace(/\s/g, '')) ? String(x.nr).replace(/\s/g, '') : null })) } : null;
+  r.drinks = dr && str(dr.style) ? { style: str(dr.style), lookFor: str(dr.lookFor), searchTerm: str(dr.searchTerm), nonAlcoholic: str(dr.nonAlcoholic),
+    bottles: arr(dr.bottles).filter(x => x && str(x.name)).slice(0, 4).map(x => ({ producer: str(x.producer), name: str(x.name), kind: str(x.kind), country: str(x.country), price: str(x.price), why: str(x.why) })),
+    found: dr.found && Array.isArray(dr.found.bottles) ? dr.found : null } : null;
   r.servings = r.servings || 4;
   if (r.source && !/^https?:\/\//.test(r.source)) r.source = null;
   r.health = r.health || null; r.tips = Array.isArray(r.tips) ? r.tips : [];
@@ -1316,22 +1323,101 @@ function recipeAfter(r) {
     ${st ? `<div class="r-extra"><h3>${L('Förvaring och rester', 'Storage and leftovers')}</h3><dl class="store">
       ${st.fridge ? `<dt>${L('Kyl', 'Fridge')}</dt><dd>${esc(st.fridge)}</dd>` : ''}${st.freezer ? `<dt>${L('Frys', 'Freezer')}</dt><dd>${esc(st.freezer)}</dd>` : ''}${st.leftovers ? `<dt>${L('Rester', 'Leftovers')}</dt><dd>${esc(st.leftovers)}</dd>` : ''}</dl></div>` : ''}`;
 }
-// Dryck till maten (helg, eller på begäran). Länk: artikelnummer om souschefen angav ett, annars sökning.
+// Dryck till maten (helg, eller på begäran). Alla länkar är sökningar hos Systembolaget –
+// gissade artikelnummer ledde till fel vin.
 const sbSearch = q => `https://www.systembolaget.se/sok/?textQuery=${encodeURIComponent(q)}`;
+const bottleName = b => b.producer && !b.name.toLowerCase().includes(b.producer.toLowerCase()) ? `${b.producer} ${b.name}` : b.name;
 function drinksBlock(r) {
   const dr = r.drinks;
   if (!dr) return `<div class="enrich"><button class="ghost" data-drinks>🍷 ${L('Föreslå dryck till maten', 'Suggest a drink')}</button></div>`;
   return `<div class="r-extra drinks"><h3>${L('Dryck till maten', 'Drinks')}</h3>
     <p class="dr-style">${esc(dr.style)}</p>
-    ${dr.bottles.length ? `<div class="bottles">${dr.bottles.map(b => `<div class="bottle">
-      <strong>${esc(b.name)}</strong>
+    ${dr.lookFor ? `<p class="dr-look"><strong>${L('Leta efter', 'Look for')}:</strong> ${esc(dr.lookFor)}</p>` : ''}
+    ${dr.searchTerm ? `<p class="b-links"><a href="${sbSearch(dr.searchTerm)}" target="_blank" rel="noopener">${L(`Sök ${esc(dr.searchTerm)} på Systembolaget`, `Search ${esc(dr.searchTerm)} at Systembolaget`)}</a></p>` : ''}
+    ${foundBlock(dr)}
+    ${!dr.found && dr.bottles.length ? `<h4 class="dr-sub">${L('Förslag på flaskor', 'Suggested bottles')}</h4><div class="bottles">${dr.bottles.map(b => `<div class="bottle">
+      <strong>${esc(bottleName(b))}</strong>
       ${[b.kind, b.country, b.price].filter(Boolean).length ? `<span class="b-meta">${esc([b.kind, b.country, b.price].filter(Boolean).join(', '))}</span>` : ''}
       ${b.why ? `<span class="b-why">${esc(b.why)}</span>` : ''}
-      <span class="b-links"><a href="${b.nr ? `https://www.systembolaget.se/${b.nr}` : sbSearch(b.name)}" target="_blank" rel="noopener">${b.nr ? L('Öppna på Systembolaget', 'Open at Systembolaget') : L('Sök på Systembolaget', 'Search Systembolaget')}</a>${b.nr ? ` <a class="b-alt" href="${sbSearch(b.name)}" target="_blank" rel="noopener">${L('Sök i stället', 'Search instead')}</a>` : ''}</span>
+      <span class="b-links"><a href="${sbSearch(bottleName(b))}" target="_blank" rel="noopener">${L('Hitta på Systembolaget', 'Find at Systembolaget')}</a></span>
     </div>`).join('')}</div>` : ''}
     ${dr.nonAlcoholic ? `<p class="dr-na"><strong>${L('Alkoholfritt', 'Alcohol-free')}:</strong> ${esc(dr.nonAlcoholic)}</p>` : ''}
-    <p class="hint">${L('Sortiment och priser ändras. Kontrollera flaskan på Systembolaget.', 'Range and prices change. Check the bottle at Systembolaget.')}</p>
+    ${S.settings.provider !== 'claude' ? `<div class="wine-find"><button class="ghost" data-winefind ${S.wineBusy ? 'disabled' : ''}>${S.wineBusy ? L('Söker på webben…', 'Searching the web…') : dr.found ? L('🔎 Sök igen', '🔎 Search again') : L('🔎 Hitta flaskor med betyg', '🔎 Find rated bottles')}</button>
+      ${S.wineErr ? `<p class="wine-err">${esc(S.wineErr)}</p>` : ''}</div>` : ''}
+    <p class="hint">${dr.found ? L('Betygen kommer från källorna som länkas. Kontrollera pris och sortiment på Systembolaget.', 'Ratings come from the linked sources. Check price and range at Systembolaget.') : L('Flaskorna är souschefens förslag och kan ha utgått. Länkarna söker på namnet, och stilen ovan hjälper dig välja om flaskan saknas.', 'The bottles are the sous-chef\'s suggestions and may have been discontinued. The links search by name, and the style above helps you choose if a bottle is missing.')}</p>
   </div>`;
+}
+// Flaskor med betyg: Gemini söker på webben (Google-sökning) och anger källa för varje betyg.
+function foundBlock(dr) {
+  const f = dr.found; if (!f) return '';
+  const when = new Date(f.at).toLocaleDateString(LOCALE(), { day: 'numeric', month: 'short' });
+  return `<h4 class="dr-sub">${L('Flaskor med betyg', 'Rated bottles')} <span class="muted">${L(`sökt ${when}`, `searched ${when}`)}</span></h4>
+    ${f.unverified ? `<p class="wine-err">${L('Souschefen kunde inte söka på webben den här gången, så betygen kan vara gissningar.', 'The sous-chef could not search the web this time, so the ratings may be guesses.')}</p>` : ''}
+    <div class="bottles">${f.bottles.map(b => `<div class="bottle">
+      <strong>${esc(bottleName(b))}</strong>
+      ${[b.kind, b.country, b.price].filter(Boolean).length || b.temporary ? `<span class="b-meta">${esc([b.kind, b.country, b.price].filter(Boolean).join(', '))}${b.temporary ? ` <span class="tag">${L('Tillfälligt', 'Limited')}</span>` : ''}</span>` : ''}
+      ${b.rating ? `<span class="b-rating">★ ${esc(b.rating)}${b.ratingSource ? ` <span class="muted">${esc(b.ratingSource)}</span>` : ''}</span>` : ''}
+      ${b.why ? `<span class="b-why">${esc(b.why)}</span>` : ''}
+      <span class="b-links"><a href="${sbSearch(bottleName(b))}" target="_blank" rel="noopener">${L('Hitta på Systembolaget', 'Find at Systembolaget')}</a>${b.sourceUrl ? ` <a class="b-alt" href="${esc(b.sourceUrl)}" target="_blank" rel="noopener">${L('Recension', 'Review')}</a>` : ''}</span>
+    </div>`).join('')}</div>
+    ${f.na ? `<p class="dr-na"><strong>${L('Alkoholfritt', 'Alcohol-free')}:</strong> <a href="${sbSearch(f.na.name)}" target="_blank" rel="noopener">${esc(f.na.name)}</a>${f.na.why ? ` – ${esc(f.na.why)}` : ''}</p>` : ''}`;
+}
+async function findBottles() {
+  const r = S.current.recipe; if (!r?.drinks || S.wineBusy) return;
+  const key = ((window.Cloud?.active() && Cloud.geminiKey()) || S.settings.geminiKey || '').trim();
+  if (!key) { S.wineErr = L('Souschefen behöver en Gemini-nyckel. Lägg in den under Inställningar.', 'The sous-chef needs a Gemini key. Add it under Settings.'); keepScroll(renderStage); return; }
+  S.wineBusy = true; S.wineErr = ''; keepScroll(renderStage);
+  const P = S.data.prefs, dr = r.drinks, price = (DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1];
+  const prompt = `Du är sommelier i Sverige. Sök på webben och hitta 2–4 flaskor som passar till "${r.title}"${r.origin ? ` (${r.origin})` : ''}.
+Stil som passar: ${dr.style}${dr.lookFor ? `\nLeta efter: ${dr.lookFor}` : ''}
+Krav:
+- Flaskan går att köpa på Systembolaget nu, i fasta eller tillfälliga sortimentet. Kontrollera gärna på systembolaget.se.
+- Pris per flaska: ${price}.
+- Flaskan har ett publicerat betyg eller en recension från en namngiven källa, t.ex. Munskänkarna (Vinlocus), Allt om Vin, DN, Vivino eller en etablerad vinskribent. Skriv betyget exakt som källan anger det.
+- Använd bara det du hittar i sökresultaten. Hitta aldrig på betyg, priser, flaskor eller länkar. Hellre färre flaskor.
+${P.drinkNA ? '- Ge också ett alkoholfritt alternativ som finns på Systembolaget.\n' : ''}${L('', '- Write "why" and "kind" in English.\n')}Svara ENDAST med JSON, utan annan text:
+{"bottles":[{"producer":"","name":"","kind":"Rött vin","country":"","price":"149 kr","rating":"17/20","ratingSource":"Munskänkarna","sourceUrl":"https://…","temporary":false,"why":"kort varför den passar"}],"nonAlcoholic":{"name":"","why":""}}`;
+  const body = JSON.stringify({ tools: [{ google_search: {} }], contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } });
+  const models = [...new Set([S.settings.geminiModel || DEFAULT_MODELS.gemini, ...GEMINI_FALLBACKS])];
+  let lastErr = '', result = null;
+  try {
+    for (const model of models) {
+      let res;
+      try { res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body }); }
+      catch { lastErr = L('Kunde inte nå Google. Kontrollera internetuppkopplingen.', 'Could not reach Google. Check your internet connection.'); break; }
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({})), msg = j.error?.message || String(res.status);
+        console.warn('Vinsökning:', model, res.status, msg);
+        if (/api key|API_KEY/i.test(msg)) { lastErr = L('Google säger att nyckeln är ogiltig.', 'Google says the key is invalid.'); break; }
+        lastErr = res.status === 429 ? L('Gratiskvoten för webbsökning är slut för stunden. Försök igen senare.', 'The free web search quota is used up for now. Try again later.') : `${model}: ${msg}`;
+        continue;
+      }
+      const j = await res.json(), c = j.candidates?.[0];
+      const txt = (c?.content?.parts || []).filter(p => !p.thought && p.text).map(p => p.text).join('');
+      const chunks = (c?.groundingMetadata?.groundingChunks || []).map(x => x.web).filter(w => w?.uri);
+      let o = null; { const a = txt.indexOf('{'), b = txt.lastIndexOf('}'); if (a >= 0 && b > a) { try { o = JSON.parse(txt.slice(a, b + 1)); } catch { o = null; } } }
+      const list = Array.isArray(o?.bottles) ? o.bottles : [];
+      if (!list.length) { lastErr = L('Hittade inga flaskor som uppfyllde kraven.', 'Found no bottles that met the requirements.'); console.warn('Vinsökning: tomt', model, txt.slice(0, 300)); continue; }
+      result = { list, chunks, na: o.nonAlcoholic }; break;
+    }
+  } finally { S.wineBusy = false; }
+  if (!result) { S.wineErr = lastErr || L('Sökningen misslyckades.', 'The search failed.'); keepScroll(renderStage); return; }
+  // Länka bara till källor som faktiskt fanns bland sökresultaten
+  const plain = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^www\./, '').replace(/[^a-z0-9.]/g, '');
+  const hosts = result.chunks.map(w => ({ host: plain(w.title), uri: w.uri }));
+  const srcUrl = b => {
+    try { const h = plain(new URL(b.sourceUrl).hostname); if (hosts.some(x => x.host && (h === x.host || h.endsWith('.' + x.host)))) return b.sourceUrl; } catch { /* ingen giltig länk */ }
+    const name = plain(b.ratingSource).replace(/\./g, '');
+    const hit = name && hosts.find(x => x.host.replace(/\./g, '').includes(name.slice(0, 8)));
+    return hit ? hit.uri : null;
+  };
+  const str = x => typeof x === 'string' && x.trim() && !/^(null|none)$/i.test(x.trim()) ? x.trim() : null;
+  const bottles = result.list.filter(b => b && str(b.name)).slice(0, 4).map(b => ({ producer: str(b.producer), name: str(b.name), kind: str(b.kind), country: str(b.country), price: str(b.price),
+    rating: str(b.rating), ratingSource: str(b.ratingSource), sourceUrl: srcUrl(b), temporary: b.temporary === true, why: str(b.why) }));
+  const na = result.na && str(result.na.name) ? { name: str(result.na.name), why: str(result.na.why) } : null;
+  r.drinks.found = { at: now(), bottles, na, unverified: !result.chunks.length };
+  if (S.current.recipeSavedId) S.current.dirty = true;
+  saveCurrent(); keepScroll(renderStage);
 }
 const fmtMin = m => m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
 function notesBox(saved) {
@@ -1700,7 +1786,8 @@ $('#stage').addEventListener('click', async e => {
   if (t.closest('[data-hideopt]')) { S.hideOptional = !S.hideOptional; keepScroll(renderStage); return; }
   const sv = t.closest('[data-serve]');
   if (sv) { const r = S.current.recipe, x = r.serveWith?.[+sv.dataset.serve]; if (x) send(L(`Ge mig det kompletta receptet på ${x.name} som tillbehör till ${r.title}, för samma antal portioner.`, `Give me the complete recipe for ${x.name} as a side for ${r.title}, for the same number of servings.`), null, { flow: true, newDish: true }); return; }
-  if (t.closest('[data-drinks]')) { openChat(true); send(L('Föreslå dryck till receptet: fyll "drinks" enligt Dryckestips (typ av dryck, 2–3 flaskor från Systembolaget i vår prisklass och ett alkoholfritt alternativ). Ändra INTE ingredienserna eller stegen. Skicka HELA receptet i "recipe".', 'Suggest drinks for the recipe: fill "drinks" (type of drink, 2–3 bottles from Systembolaget in our price range and an alcohol-free option). Do NOT change the ingredients or the steps. Send the WHOLE recipe in "recipe".'), null, { display: L('🍷 Föreslå dryck', '🍷 Suggest a drink'), enrich: 'drinks' }); return; }
+  if (t.closest('[data-winefind]')) { findBottles(); return; }
+  if (t.closest('[data-drinks]')) { openChat(true); send(L('Föreslå dryck till receptet: fyll "drinks" enligt Dryckestips (typ av dryck och varför, vad man letar efter, sökord, 2–3 välkända flaskor från Systembolagets fasta sortiment i vår prisklass och ett alkoholfritt alternativ). Ändra INTE ingredienserna eller stegen. Skicka HELA receptet i "recipe".', 'Suggest drinks for the recipe: fill "drinks" (type of drink, 2–3 bottles from Systembolaget in our price range and an alcohol-free option). Do NOT change the ingredients or the steps. Send the WHOLE recipe in "recipe".'), null, { display: L('🍷 Föreslå dryck', '🍷 Suggest a drink'), enrich: 'drinks' }); return; }
   if (t.closest('[data-enrich]')) { openChat(true); send(L('Komplettera receptet med "title" för varje steg, översikt, aktiv tid, det som måste göras i förväg, byten för ingredienser, valfria steg, "howTo" för svåra moment, om det går fel, servera med och förvaring. Ändra INTE ingredienserna eller stegens text. Skicka HELA receptet i "recipe".', 'Add a "title" to every step, an overview, active time, what must be done ahead, ingredient swaps, optional steps, "howTo" for tricky techniques, troubleshooting, serve-with ideas and storage to the recipe. Do NOT change the ingredients or the steps. Send the WHOLE recipe in "recipe".'), null, { display: L('Lägg till stegrubriker, översikt och tips', 'Add step headings, overview and tips'), enrich: true }); return; }
   // Recept
   const chk = t.closest('[data-check]');

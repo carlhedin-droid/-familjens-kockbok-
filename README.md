@@ -5,7 +5,7 @@ Adress: https://souschefen.pages.dev/
 Familjens souschef och kokbok som webbapp. Fungerar på dator, mobil och platta och använder Google Gemini (gratis).
 
 - **Laga mat:** Beskriv vad ni har (eller fota kylen) och få 5–8 förslag med förklaring. Välj ett och få hela receptet.
-- **Receptet:** Översikt, tid i förväg, ingredienser med byten och steg (valfria steg och "Visa hur" på YouTube). Längst ner: om det går fel, servera med, dryck till maten (helg, med flaskor från Systembolaget) samt förvaring och rester. Stående skärm: ingredienserna först, sedan stegen. Liggande skärm: steg och ingredienser sida vid sida. Portioner med − och +, timers, och skärmen hålls tänd.
+- **Receptet:** Översikt, tid i förväg, ingredienser med byten och steg (valfria steg och "Visa hur" på YouTube). Längst ner: om det går fel, servera med, dryck till maten (helg, med sökning på Systembolaget och knappen "Hitta flaskor med betyg" som söker recensioner på webben) samt förvaring och rester. Stående skärm: ingredienserna först, sedan stegen. Liggande skärm: steg och ingredienser sida vid sida. Portioner med − och +, timers, och skärmen hålls tänd.
 - **Fråga souschefen:** Chatt bredvid receptet för frågor under matlagningen. Ber du om en ändring uppdateras receptet.
 - **Snabbval (uppe till höger):** Vardag eller helg, tid idag och portioner.
 - **Inställningar:** Språk (svenska eller engelska), hushåll och allergier, tidsramar för vardag och helg, hälsomål, favoritländer, specialutrustning och bakning av bröd samt dryck (prisklass och alkoholfritt alternativ).
