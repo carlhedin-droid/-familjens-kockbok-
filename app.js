@@ -1101,7 +1101,7 @@ function viewHome() {
   const d = dayInfo();
   const P = S.data.prefs;
   const t = todayTime();
-  const hist = (S.data.history || []).slice(0, 8);
+  const hist = (S.data.history || []).slice(0, 5);
   if (S.busy === 'flow') {
     return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">${L('Souschefen tänker…', 'The sous-chef is thinking…')}</span></div></section>`;
   }
@@ -1125,9 +1125,9 @@ function viewHome() {
     ${hist.length || S.current.suggestions ? `<div class="recent-strip">
       ${syncNote()}
       <div class="strip-head"><h2>${L(`Senaste recept`, `Recent recipes`)}</h2>${hist.length ? `<button class="linkish" data-showhist>${L('Visa alla', 'Show all')} (${(S.data.history || []).length})</button>` : ''}</div>
-      <div class="strip">
-        ${S.current.suggestions ? `<button class="mini-card sugg-card" data-go="suggestions"><span class="mc-title">${L('Senaste förslagen', 'Latest suggestions')}</span><span class="mc-sub">${S.current.suggestions.length} ${L('rätter', 'dishes')}</span></button>` : ''}
-        ${hist.map(h => `<button class="mini-card" data-hist="${h.id}"><span class="mc-flag">${flags(h.recipe)}</span><span class="mc-title">${esc(h.recipe.title)}</span><span class="mc-sub">${esc(histDate(h))}${histSaved(h) ? L(' · i kokboken', ' · in the cookbook') : ''}</span></button>`).join('')}
+      <div class="book-list home-list">
+        ${S.current.suggestions ? `<button class="book-row" data-go="suggestions"><h3>${L('Senaste förslagen', 'Latest suggestions')}</h3><span class="sub">${S.current.suggestions.length} ${L('rätter', 'dishes')}</span></button>` : ''}
+        ${hist.map(histRow).join('')}
       </div></div>` : ''}
   </section>`;
 }
