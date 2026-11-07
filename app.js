@@ -1404,37 +1404,59 @@ Svara ENDAST med JSON: {"reports":[{"title":"Tillfälligt sortiment 6 november 2
   try { localStorage.setItem('fk.vinlocus', JSON.stringify({ t: Date.now(), reports })); } catch { /* full lagring */ }
   return reports;
 }
+// Jämför provnings-URL:er på sista delen av sökvägen (modellen kan skriva med/utan snedstreck, http, www m.m.)
+const slugOf = u => String(u || '').toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop();
+const plainTitle = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+async function pickFromReports(r, use, key, price, loose) {
+  const dr = r.drinks;
+  const { o, read } = await geminiRead(`Du är sommelier. Läs Munskänkarnas provningar nedan och välj 2–4 viner (eller annan dryck) som passar till "${r.title}"${r.origin ? ` (${r.origin})` : ''}.
+Stil som passar: ${dr.style}${dr.lookFor ? `\nLeta efter: ${dr.lookFor}` : ''}
+Stilen är vägledande: välj det som passar rätten bäst bland vinerna som finns på sidorna, även om druva eller område inte är exakt det som nämns. ${loose ? 'Välj alltid minst 2 viner om sidorna har viner i en färg som passar.' : ''}
+Pris per flaska: helst ${price}, men upp till ca 30 % utanför går bra om vinet passar riktigt bra. Välj gärna viner med högt betyg eller märkningen Prisvärt.
+Provningar:
+${use.map(x => `- ${x.title}: ${x.url}`).join('\n')}
+Regler: Använd BARA viner som står på sidorna. Skriv betyg, pris och Systembolagets artikelnummer exakt som sidan anger. Ange i "report" URL:en till provningen där vinet står, exakt som i listan ovan. Hitta aldrig på något.
+${L('', 'Write "why" and "kind" in English.\n')}Svara ENDAST med JSON:
+{"bottles":[{"producer":"","name":"","vintage":"2023","kind":"Rött vin","country":"","price":"159 kr","score":"15/20","nr":"95677","report":"https://munskankarna.se/sv/vinlocus/...","reportTitle":"Tillfälligt sortiment 6 november 2026","why":"kort varför det passar till rätten"}]}`, key);
+  const bySlug = Object.fromEntries(use.map(x => [slugOf(x.url), x])), byTitle = Object.fromEntries(use.map(x => [plainTitle(x.title), x]));
+  const list = Array.isArray(o.bottles) ? o.bottles : [];
+  const str = x => typeof x === 'string' && x.trim() && !/^(null|none)$/i.test(x.trim()) ? x.trim() : (typeof x === 'number' ? String(x) : null);
+  // Bara viner som pekar på en av provningarna vi skickade – annat kan vara påhittat
+  const bottles = list.filter(b => b && str(b.name)).map(b => ({ b, rep: bySlug[slugOf(b.report)] || byTitle[plainTitle(b.reportTitle)] || null })).filter(x => x.rep).slice(0, 4).map(({ b, rep }) => {
+    const nr = String(b.nr || '').replace(/\s/g, ''), score = str(b.score);
+    return { producer: str(b.producer), name: [str(b.name), str(b.vintage)].filter(Boolean).join(' '), kind: str(b.kind), country: str(b.country), price: str(b.price),
+      rating: score ? (/\//.test(score) ? score : `${score}/20`) : null, ratingSource: 'Munskänkarna', sourceUrl: rep.url,
+      nr: /^\d{3,8}$/.test(nr) ? nr : null, temporary: rep.type === 'tillfalligt', why: str(b.why) };
+  });
+  return { bottles, suggested: list.length, read: read.length };
+}
 async function findBottles() {
   const r = S.current.recipe; if (!r?.drinks || S.wineBusy) return;
   const key = ((window.Cloud?.active() && Cloud.geminiKey()) || S.settings.geminiKey || '').trim();
   if (!key) { S.wineErr = L('Souschefen behöver en Gemini-nyckel. Lägg in den under Inställningar.', 'The sous-chef needs a Gemini key. Add it under Settings.'); keepScroll(renderStage); return; }
   S.wineBusy = true; S.wineErr = ''; keepScroll(renderStage);
-  const P = S.data.prefs, dr = r.drinks, price = (DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1];
+  const P = S.data.prefs, price = (DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1];
   try {
     const all = await vinlocusReports(key);
-    const pick = (type, n) => all.filter(x => x.type === type).slice(0, n);
-    const reports = [...pick('hitlista', 2), ...pick('tillfalligt', 3), ...pick('fast', 1)];
-    const use = reports.length ? reports : all.slice(0, 5);
-    const { o, read } = await geminiRead(`Du är sommelier. Läs Munskänkarnas provningar nedan och välj 2–4 viner (eller annan dryck) som passar till "${r.title}"${r.origin ? ` (${r.origin})` : ''}.
-Stil som passar: ${dr.style}${dr.lookFor ? `\nLeta efter: ${dr.lookFor}` : ''}
-Pris per flaska: ${price}. Välj helst viner med högt betyg och märkningen Prisvärt.
-Provningar:
-${use.map(x => `- ${x.title}: ${x.url}`).join('\n')}
-Regler: Använd BARA viner som står på sidorna. Skriv betyg, pris och Systembolagets artikelnummer exakt som sidan anger. Hitta aldrig på något. Hellre färre viner.
-${L('', 'Write "why" and "kind" in English.\n')}Svara ENDAST med JSON:
-{"bottles":[{"producer":"","name":"","vintage":"2023","kind":"Rött vin","country":"","price":"159 kr","score":"15/20","nr":"95677","report":"URL till provningen där vinet står","why":"kort varför det passar till rätten"}]}`, key);
-    const byUrl = Object.fromEntries(use.map(x => [x.url, x]));
-    const str = x => typeof x === 'string' && x.trim() && !/^(null|none)$/i.test(x.trim()) ? x.trim() : (typeof x === 'number' ? String(x) : null);
-    // Bara viner som pekar på en av provningarna vi skickade – annat kan vara påhittat
-    const bottles = (Array.isArray(o.bottles) ? o.bottles : []).filter(b => b && str(b.name) && byUrl[str(b.report)]).slice(0, 4).map(b => {
-      const rep = byUrl[str(b.report)] || null, nr = String(b.nr || '').replace(/\s/g, '');
-      const score = str(b.score);
-      return { producer: str(b.producer), name: [str(b.name), str(b.vintage)].filter(Boolean).join(' '), kind: str(b.kind), country: str(b.country), price: str(b.price),
-        rating: score ? (/\//.test(score) ? score : `${score}/20`) : null, ratingSource: 'Munskänkarna', sourceUrl: rep ? rep.url : null,
-        nr: /^\d{3,8}$/.test(nr) ? nr : null, temporary: rep?.type === 'tillfalligt', why: str(b.why) };
-    });
-    if (!bottles.length) throw new Error(L('Hittade inga viner som passade i Munskänkarnas senaste provningar.', 'Found no matching wines in Munskänkarna\'s latest tastings.'));
-    r.drinks.found = { at: now(), bottles, na: null, unverified: !read.length, source: 'vinlocus' };
+    // Omgång 1: senaste topplistor, tillfälliga och fasta. Omgång 2: nästa i tur, alla typer utom webbhandel.
+    const take = (type, from, n) => all.filter(x => x.type === type).slice(from, from + n);
+    const round1 = [...take('hitlista', 0, 2), ...take('tillfalligt', 0, 4), ...take('fast', 0, 2)];
+    const used = new Set(round1.map(x => x.url));
+    const round2 = all.filter(x => !used.has(x.url) && x.type !== 'webb').slice(0, 8);
+    let res = { bottles: [], suggested: 0, read: 0 }, tried = 0, readTotal = 0, suggested = 0;
+    for (const [k, use] of [[1, round1.length ? round1 : all.slice(0, 8)], [2, round2]]) {
+      if (!use.length) continue;
+      tried += use.length;
+      res = await pickFromReports(r, use, key, price, k === 2);
+      readTotal += res.read; suggested += res.suggested;
+      if (res.bottles.length) break;
+    }
+    if (!res.bottles.length) {
+      throw new Error(!readTotal ? L(`Kunde inte läsa Munskänkarnas provningar (0 av ${tried} sidor). Försök igen om en stund.`, `Could not read Munskänkarna's tastings (0 of ${tried} pages). Try again in a while.`)
+        : suggested ? L(`Souschefen föreslog ${suggested} viner men kunde inte koppla dem till en provning, så de visas inte.`, `The sous-chef suggested ${suggested} wines but could not link them to a tasting, so they are hidden.`)
+        : L(`Hittade inga passande viner i ${tried} provningar (${readTotal} lästa).`, `Found no matching wines in ${tried} tastings (${readTotal} read).`));
+    }
+    r.drinks.found = { at: now(), bottles: res.bottles, na: null, unverified: !res.read, source: 'vinlocus' };
     if (S.current.recipeSavedId) S.current.dirty = true;
     saveCurrent();
   } catch (e) { S.wineErr = e.message || String(e); }
