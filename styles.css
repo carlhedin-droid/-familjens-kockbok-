@@ -720,3 +720,11 @@ a.howto { text-decoration: none; color: var(--ink); }
 .dr-sub .muted { font-weight: 400; font-size: 13.5px; }
 .bottle .tag { font-size: 12px; padding: 1px 7px; vertical-align: 1px; }
 .dr-na a { color: var(--pandan); font-weight: 700; text-underline-offset: 3px; }
+
+/* Dryck: alternativ i stället för flaskor (nov 2026) */
+.drink-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 8px; }
+.drink { display: grid; gap: 4px; align-content: start; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-md); padding: 10px 12px; }
+.drink strong { font-family: var(--font-display); }
+.b-look { font-size: 14px; }
+.b-look b { font-weight: 700; }
+.dr-price { margin: 10px 0 0; max-width: 64ch; }
