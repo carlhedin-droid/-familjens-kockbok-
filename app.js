@@ -1101,11 +1101,6 @@ function viewHome() {
   const d = dayInfo();
   const P = S.data.prefs;
   const t = todayTime();
-  const gear = d.weekend && P.weekendGear ? ['Kolgrill', 'Sous vide', 'Rökskåp', 'Pizzaugn'].filter(x => P.equipment.includes(x) || P.customEquipment.includes(x)).slice(0, 2).map(x => tv(x).toLowerCase()) : [];
-  const dinner = d.weekend ? P.dinnerWeekend : P.dinnerWeekday, nowMin = new Date().getHours() * 60 + new Date().getMinutes(), dm = hm(dinner);
-  const startBy = dm != null && dm - nowMin > 0 ? (() => { const st = dm - (parseInt(t.key) || 180); const left = dm - nowMin; const by = `${String(Math.floor(st / 60)).padStart(2, '0')}:${String(st % 60).padStart(2, '0')}`; return ` ${L('Middag', 'Dinner')} ${dinner} – ${left <= (parseInt(t.key) || 180) ? `<strong>${L('börja nu', 'start now')}</strong>` : L(`börja senast ${by}`, `start by ${by}`)}.`; })() : '';
-  const hint = L(`${d.manual ? (d.weekend ? 'Helgläge' : 'Vardagsläge') : `Det är <strong>${d.name}</strong> – ${d.weekend ? 'helg' : 'vardag'}`}. Tidsram <strong>${t.label}</strong>${d.weekend ? (gear.length ? `, gärna ${gear.join(' eller ')}` : ', gärna ett projekt') : ', lite disk'}.`,
-    `${d.manual ? (d.weekend ? 'Weekend mode' : 'Weekday mode') : `It's <strong>${dayName()}</strong> – ${d.weekend ? 'weekend' : 'weekday'}`}. Time frame <strong>${t.label}</strong>${d.weekend ? (gear.length ? `, ideally ${gear.join(' or ')}` : ', ideally a project') : ', few dishes'}.`) + `${startBy} <button class="linkish" data-status>${L('Ändra', 'Change')}</button>`;
   const hist = (S.data.history || []).slice(0, 8);
   if (S.busy === 'flow') {
     return `<section class="home"><div class="loading-stage">${potSvg()}<span id="stageStatus">${L('Souschefen tänker…', 'The sous-chef is thinking…')}</span></div></section>`;
@@ -1114,9 +1109,8 @@ function viewHome() {
     ${movedNote()}
     ${sessionBanner()}
     <h1>${L(`Vad lagar vi idag?`, `What's for dinner?`)}</h1>
-    <p class="day-line">${hint}</p>
     <form class="asker" id="homeAsk">
-      <textarea id="homeInput" placeholder="${L('Vad har ni hemma? T.ex. kycklinglår, vitkål och kokosmjölk – något starkt.&#10;&#10;Eller klistra in en länk till ett recept så renskriver souschefen det åt er.', 'What do you have at home? E.g. chicken thighs, white cabbage and coconut milk – something spicy.&#10;&#10;Or paste a link to a recipe and the sous-chef will clean it up for you.')}" aria-label="${L('Beskriv vad ni har och vad ni vill ha', 'Describe what you have and what you want')}"></textarea>
+      <textarea id="homeInput" placeholder="${L('Vad har ni hemma och vad är ni sugna på? Eller klistra in en receptlänk.', 'What do you have and what do you fancy? Or paste a recipe link.')}" aria-label="${L('Beskriv vad ni har och vad ni vill ha', 'Describe what you have and what you want')}"></textarea>
       <div class="attach-preview" id="homeAttach" ${S.homeAttach ? '' : 'hidden'}>${S.homeAttach ? `<img src="${S.homeAttach.url}" alt=""><span>${L('Foto bifogat', 'Photo attached')}</span>` : ''}</div>
       <div class="asker-row">
         <label class="ghost" title="${L('Fota kylen eller skafferiet', 'Take a photo of the fridge or pantry')}">
@@ -1124,17 +1118,10 @@ function viewHome() {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
           ${L('Foto', 'Photo')}
         </label>
-        <span class="ask-hint" id="askHint">🔗 ${L('Klistra in en receptlänk så renskrivs receptet med era portioner', 'Paste a recipe link to have it cleaned up with your servings')}</span>
+        <span class="ask-hint" id="askHint" hidden></span>
         <button class="btn" type="submit" id="askBtn">${L('Ge oss förslag', 'Give us suggestions')}</button>
       </div>
     </form>
-    ${hist.length || S.current.suggestions ? `<div class="recent-strip">
-      ${syncNote()}
-      <div class="strip-head"><h2>${L(`Senaste recept`, `Recent recipes`)}</h2>${hist.length ? `<button class="linkish" data-showhist>${L('Visa alla', 'Show all')} (${(S.data.history || []).length})</button>` : ''}</div>
-      <div class="strip">
-        ${S.current.suggestions ? `<button class="mini-card sugg-card" data-go="suggestions"><span class="mc-title">${L('Senaste förslagen', 'Latest suggestions')}</span><span class="mc-sub">${S.current.suggestions.length} ${L('rätter', 'dishes')}</span></button>` : ''}
-        ${hist.map(h => `<button class="mini-card" data-hist="${h.id}"><span class="mc-flag">${flags(h.recipe)}</span><span class="mc-title">${esc(h.recipe.title)}</span><span class="mc-sub">${esc(histDate(h))}${histSaved(h) ? L(' · i kokboken', ' · in the cookbook') : ''}</span></button>`).join('')}
-      </div></div>` : ''}
     <div class="quick">
       ${[
         d.weekend ? L('Helgprojekt ikväll', 'Weekend project tonight') : L(`Snabb middag på ${todayTime().label}`, `Quick dinner in ${todayTime().label}`),
@@ -1144,6 +1131,13 @@ function viewHome() {
         L('Laga om en favorit från kokboken', 'Cook a favourite from the cookbook again'),
       ].map(q => `<button class="chip" data-quick="${esc(q)}">${esc(q)}</button>`).join('')}
     </div>
+    ${hist.length || S.current.suggestions ? `<div class="recent-strip">
+      ${syncNote()}
+      <div class="strip-head"><h2>${L(`Senaste recept`, `Recent recipes`)}</h2>${hist.length ? `<button class="linkish" data-showhist>${L('Visa alla', 'Show all')} (${(S.data.history || []).length})</button>` : ''}</div>
+      <div class="strip">
+        ${S.current.suggestions ? `<button class="mini-card sugg-card" data-go="suggestions"><span class="mc-title">${L('Senaste förslagen', 'Latest suggestions')}</span><span class="mc-sub">${S.current.suggestions.length} ${L('rätter', 'dishes')}</span></button>` : ''}
+        ${hist.map(h => `<button class="mini-card" data-hist="${h.id}"><span class="mc-flag">${flags(h.recipe)}</span><span class="mc-title">${esc(h.recipe.title)}</span><span class="mc-sub">${esc(histDate(h))}${histSaved(h) ? L(' · i kokboken', ' · in the cookbook') : ''}</span></button>`).join('')}
+      </div></div>` : ''}
   </section>`;
 }
 function potSvg() {
@@ -1292,6 +1286,7 @@ function bookRow(r) {
   </button>`;
 }
 function syncNote() {
+  if (window.Cloud?.configured()) return '';  // familjekontot synkar allt
   if (!S.settings.ghToken) return `<div class="sync-note">${L('Historiken finns bara på den här enheten.', 'The history is only on this device.')} <button class="linkish" data-go="settings">${L('Slå på delning', 'Turn on sharing')}</button> ${L('för att fortsätta på en annan enhet.', 'to continue on another device.')}</div>`;
   if (/misslyckades|Fel token/.test(S.sync.state || '')) return `<div class="sync-note err">${L('Delningen fungerar inte just nu', 'Sharing is not working right now')} (${esc(tv(S.sync.state))}${$('#sync')?.title ? ': ' + esc($('#sync').title) : ''}). <button class="linkish" data-go="settings">${L('Kontrollera kopplingen', 'Check the connection')}</button></div>`;
   return '';
@@ -1343,68 +1338,76 @@ function viewBook() {
   </section>`;
 }
 
-function prefsCards() {
+/* Inställningarna: en lista med hopfällda sektioner. Varje rad visar vad som är valt. */
+function secSummary(key) {
+  const P = S.data.prefs, s = S.settings;
+  const list = (a, none) => a.length ? a.map(tv).join(', ') : none;
+  const lab = (opts, k) => k ? tv((opts.find(x => x[0] === k) || [, ''])[1]) : '';
+  switch (key) {
+    case 'household': return L(`${P.portions} portioner`, `${P.portions} servings`) + (P.bigEaters ? L(', rejäla', ', generous') : '') + (P.allergies.trim() ? `. ${L('Allergier', 'Allergies')}: ${P.allergies.trim()}` : '');
+    case 'days': return `${L('Vardag', 'Weekday')} ${timeLabel(P.weekdayTime)}, ${L('helg', 'weekend')} ${timeLabel(P.weekendTime)}`;
+    case 'health': return P.healthNote.trim() ? (P.healthWho.trim() ? `${P.healthWho.trim()}: ` : '') + P.healthNote.trim() : L('Inget mål', 'No goal');
+    case 'cuisines': return list(P.cuisines, L('Alla kök', 'All cuisines'));
+    case 'equipment': return list([...P.equipment, ...P.customEquipment], L('Vanligt kök', 'Regular kitchen'));
+    case 'bread': { const b = [...P.breadLeaven.map(tv), lab(BREAD_OPT.proof, P.breadProof), lab(BREAD_OPT.knead, P.breadKnead), lab(BREAD_OPT.hydration, P.breadHydration), ...P.breadFlour.map(tv), ...P.breadBake.map(tv)].filter(Boolean);
+      return b.length ? b.join(', ') : L('Efter receptet', 'Follow the recipe'); }
+    case 'memory': { const n = S.data.memory.filter(m => !m.deleted).length;
+      return n ? L(`${n} ${n === 1 ? 'sak' : 'saker'}`, `${n} ${n === 1 ? 'thing' : 'things'}`) : L('Inget ännu', 'Nothing yet'); }
+    case 'account': {
+      if (window.Cloud?.configured()) { const u = Cloud.state.user, k = Cloud.geminiKey(); return (u?.email || L('Inte inloggad', 'Not signed in')) + (k ? '' : L('. Ingen nyckel ännu', '. No key yet')); }
+      return s[s.provider === 'claude' ? 'claudeKey' : 'geminiKey'] ? L('Nyckel sparad', 'Key saved') : L('Ingen nyckel ännu', 'No key yet'); }
+    case 'advanced': return `${s.provider === 'claude' ? 'Claude' : 'Gemini'}, ${L('tema', 'theme')} ${({ auto: L('som enheten', 'match device'), light: L('ljust', 'light'), dark: L('mörkt', 'dark') })[s.theme] || ''}`;
+  }
+  return '';
+}
+function refreshSummaries() { document.querySelectorAll('[data-sum]').forEach(el => { el.textContent = secSummary(el.dataset.sum); }); }
+function sec(key, title, body) {
+  const open = (S.openSecs ||= new Set()).has(key);
+  return `<details class="set-sec" data-sec="${key}"${open ? ' open' : ''}>
+      <summary><span class="ss-title">${title}</span><span class="ss-sum" data-sum="${key}">${esc(secSummary(key))}</span></summary>
+      <div class="ss-body">${body}</div></details>`;
+}
+function prefsSections() {
   const P = S.data.prefs;
   const chip = (key, val, label = tv(val)) => `<button type="button" class="chip opt" data-ptoggle="${key}" data-val="${esc(val)}" aria-pressed="${P[key].includes(val)}">${esc(label)}</button>`;
-  const seg = (key, opts) => `<div class="seg wrap" role="group">${opts.map(([k, l]) => `<button type="button" data-pset="${key}" data-val="${k}" aria-pressed="${P[key] === k}">${tv(l)}</button>`).join('')}</div>`;
-  return `
-    <div class="card">
-      <h2>${L('Hushållet', 'Household')}</h2>
+  const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([k, l]) => `<button type="button" data-pset="${key}" data-val="${k}" aria-pressed="${P[key] === k}">${k === 'lang' ? L('Eftermiddag', 'Afternoon') : tv(l)}</button>`).join('')}</div>`;
+  const sel = (key, label, opts) => `<div class="field"><label for="${key}">${label}</label><select id="${key}" data-psel="${key}">${opts.map(([k, l]) => `<option value="${k}"${P[key] === k ? ' selected' : ''}>${esc(tv(l))}</option>`).join('')}</select></div>`;
+  const groups = (gs, render) => gs.map(([g, list]) => `<div class="opt-group"><h3>${esc(tv(g))}</h3><div class="chips">${list.map(render).join('')}</div></div>`).join('');
+  return [
+    sec('household', L('Hushållet', 'Household'), `
       <div class="field"><label>${L('Portioner', 'Servings')}</label>
         <div class="row"><div class="stepper"><button type="button" data-portions="-1" aria-label="${L('Färre portioner', 'Fewer servings')}">−</button><output>${P.portions}</output><button type="button" data-portions="1" aria-label="${L('Fler portioner', 'More servings')}">+</button></div>
-        <button type="button" class="chip opt" data-pbool="bigEaters" aria-pressed="${P.bigEaters}">${L('Vi äter mycket – räkna rejält', 'We eat a lot – be generous')}</button></div></div>
-      <div class="field"><label for="allergies">${L('Allergier och äter inte', 'Allergies and foods to avoid')}</label><input id="allergies" data-ptext="allergies" value="${esc(P.allergies)}" placeholder="${L('T.ex. nötter, koriander (Sara), inga svampar till barnen', 'E.g. nuts, coriander, no mushrooms for the kids')}"><span class="hint">${L(`Souschefen bryter aldrig mot det här.`, `The sous-chef never breaks this.`)}</span></div>
-      <div class="field"><label for="profile">${L(`Övrigt om familjen`, `More about the family`)}</label><textarea id="profile" data-ptext="profile" rows="2" style="min-height:70px">${esc(S.data.profile)}</textarea></div>
-    </div>
-
-    <div class="card">
-      <h2>${L('Vardag och helg', 'Weekdays and weekends')}</h2>
-      <p>${L(`Vad dagarna betyder för er. Snabbvalet uppe till höger väljer vilken som gäller idag – automatiskt efter veckodag – och där kan du också ändra tiden för stunden.`, `What the days mean for you. The quick menu at the top right picks which one applies today – automatically by weekday – and lets you change the time for now.`)}</p>
-      <div class="day-cols">
-        <div class="day-col"><h3>${L('Vardag', 'Weekday')} <span class="muted">${L('mån–tor', 'Mon–Thu')}</span></h3>
+        <button type="button" class="chip opt" data-pbool="bigEaters" aria-pressed="${P.bigEaters}">${L('Vi äter mycket', 'We eat a lot')}</button></div></div>
+      <div class="field"><label for="allergies">${L('Allergier och äter inte', 'Allergies and foods to avoid')}</label><input id="allergies" data-ptext="allergies" value="${esc(P.allergies)}" placeholder="${L('T.ex. nötter, koriander', 'E.g. nuts, coriander')}"><span class="hint">${L('Souschefen bryter aldrig mot det här.', 'The sous-chef never breaks this.')}</span></div>
+      <div class="field"><label for="profile">${L('Om familjen', 'About the family')}</label><textarea id="profile" data-ptext="profile" rows="3" class="short">${esc(S.data.profile)}</textarea></div>`),
+    sec('days', L('Vardag och helg', 'Weekdays and weekends'), `
+      <div class="day-grid">
+        <div><h3>${L('Vardag', 'Weekday')} <span class="muted">${L('mån–tor', 'Mon–Thu')}</span></h3>
           <div class="field"><label>${L('Tidsram', 'Time frame')}</label>${seg('weekdayTime', TIMES.slice(0, 3))}</div>
-          <div class="field"><label for="dinnerWeekday">${L(`Middag serveras`, `Dinner is served`)}</label><input type="time" id="dinnerWeekday" data-ptext="dinnerWeekday" value="${esc(P.dinnerWeekday)}" class="time-input"></div>
-          <p class="hint">${L(`Genvägar, allt-i-ett och lite disk.`, `Shortcuts, all-in-one and few dishes.`)}</p></div>
-        <div class="day-col"><h3>${L('Helg', 'Weekend')} <span class="muted">${L('fre–sön', 'Fri–Sun')}</span></h3>
+          <div class="field"><label for="dinnerWeekday">${L('Middag serveras', 'Dinner is served')}</label><input type="time" id="dinnerWeekday" data-ptext="dinnerWeekday" value="${esc(P.dinnerWeekday)}"></div></div>
+        <div><h3>${L('Helg', 'Weekend')} <span class="muted">${L('fre–sön', 'Fri–Sun')}</span></h3>
           <div class="field"><label>${L('Tidsram', 'Time frame')}</label>${seg('weekendTime', TIMES.slice(3))}</div>
-          <div class="field"><label for="dinnerWeekend">${L(`Middag serveras`, `Dinner is served`)}</label><input type="time" id="dinnerWeekend" data-ptext="dinnerWeekend" value="${esc(P.dinnerWeekend)}" class="time-input"></div>
-          <button type="button" class="chip opt" data-pbool="weekendGear" aria-pressed="${P.weekendGear}">${L(`Använd gärna specialutrustningen`, `Feel free to use special equipment`)}</button></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>${L('Hälsomål', 'Health goal')}</h2>
+          <div class="field"><label for="dinnerWeekend">${L('Middag serveras', 'Dinner is served')}</label><input type="time" id="dinnerWeekend" data-ptext="dinnerWeekend" value="${esc(P.dinnerWeekend)}"></div>
+          <button type="button" class="chip opt" data-pbool="weekendGear" aria-pressed="${P.weekendGear}">${L('Använd specialutrustning', 'Use special equipment')}</button></div>
+      </div>`),
+    sec('health', L('Hälsomål', 'Health goal'), `
       <div class="field"><label for="healthWho">${L('Gäller', 'Applies to')}</label><input id="healthWho" data-ptext="healthWho" value="${esc(P.healthWho)}" placeholder="${L('T.ex. Pappa, alla', 'E.g. Dad, everyone')}"></div>
-      <div class="field"><label for="healthNote">${L(`Målet med egna ord`, `The goal in your own words`)}</label><textarea id="healthNote" data-ptext="healthNote" rows="3" style="min-height:80px">${esc(P.healthNote)}</textarea></div>
-      <button type="button" class="chip opt" data-pbool="healthyAlt" aria-pressed="${P.healthyAlt}">${L(`Avsluta alltid receptet med ett lättare alternativ`, `Always end the recipe with a lighter option`)}</button>
-    </div>
-
-    <div class="card">
-      <h2>${L('Favoritländer', 'Favourite countries')}</h2>
-      <p>${L(`Förslagen sprids över de länders kök ni väljer.`, `Suggestions are spread across the cuisines of the countries you choose.`)}</p>
-      ${OPT.cuisines.map(([reg, list]) => `<div class="opt-group"><h3>${esc(tv(reg))}</h3><div class="chips">${list.map(([cc, name]) => `<button type="button" class="chip opt flagchip" data-ptoggle="cuisines" data-val="${esc(name)}" aria-pressed="${P.cuisines.includes(name)}">${flags({ countries: [cc] })}${esc(tv(name))}</button>`).join('')}</div></div>`).join('')}
-    </div>
-
-    <div class="card">
-      <h2>${L('Specialutrustning', 'Special equipment')}</h2>
-      <p>${L(`Bara det ni har utöver ett vanligt kök. Spis, ugn, mikro, stekpannor, kastruller, ugnsformar, stavmixer, elvisp och våg räknas alltid med.`, `Only what you have beyond a regular kitchen. Hob, oven, microwave, frying pans, saucepans, oven dishes, stick blender, electric whisk and scales are always included.`)}</p>
-      ${OPT.equipment.map(([grp, list]) => `<div class="opt-group"><h3>${esc(tv(grp))}</h3><div class="chips">${list.map(v => chip('equipment', v)).join('')}</div></div>`).join('')}
-      <div class="chips">${P.customEquipment.map(v => `<button type="button" class="chip opt" data-premove="${esc(v)}" aria-pressed="true" title="${L('Tryck för att ta bort', 'Tap to remove')}">${esc(v)} ×</button>`).join('')}</div>
-      <div class="row" style="margin-top:12px"><input id="equipNew" class="search" placeholder="${L('Lägg till egen, t.ex. Plancha', 'Add your own, e.g. Plancha')}" style="max-width:none"><button class="ghost" data-equipadd>${L('Lägg till', 'Add')}</button></div>
-    </div>
-
-    <div class="card">
-      <h2>${L('Bakning av bröd', 'Bread baking')}</h2>
-      <p>${L(`Gäller när ni bakar bröd. Det ni lämnar tomt väljer souschefen efter receptet.`, `Applies when you bake bread. Whatever you leave empty, the sous-chef picks to suit the recipe.`)}</p>
-      <div class="opt-group"><h3>${L('Jäsmedel', 'Leavening')}</h3><div class="chips">${BREAD_OPT.leaven.map(v => chip('breadLeaven', v)).join('')}</div>
-        <div style="margin-top:10px"><button type="button" class="chip opt" data-pbool="breadStarter" aria-pressed="${P.breadStarter}">${L(`Vi har en levande surdegsgrund hemma`, `We keep a live sourdough starter at home`)}</button></div></div>
-      <div class="field"><label>${L('Jäsning', 'Proofing')}</label>${seg('breadProof', BREAD_OPT.proof)}</div>
-      <div class="field"><label>${L('Knådning', 'Kneading')}</label>${seg('breadKnead', BREAD_OPT.knead)}</div>
-      <div class="field"><label>${L('Degens fuktighet', 'Dough hydration')}</label>${seg('breadHydration', BREAD_OPT.hydration)}</div>
+      <div class="field"><label for="healthNote">${L('Målet med egna ord', 'The goal in your own words')}</label><textarea id="healthNote" data-ptext="healthNote" rows="3" class="short">${esc(P.healthNote)}</textarea></div>
+      <button type="button" class="chip opt" data-pbool="healthyAlt" aria-pressed="${P.healthyAlt}">${L('Avsluta receptet med ett lättare alternativ', 'End the recipe with a lighter option')}</button>`),
+    sec('cuisines', L('Favoritländer', 'Favourite countries'), groups(OPT.cuisines, ([cc, name]) => `<button type="button" class="chip opt flagchip" data-ptoggle="cuisines" data-val="${esc(name)}" aria-pressed="${P.cuisines.includes(name)}">${flags({ countries: [cc] })}${esc(tv(name))}</button>`)),
+    sec('equipment', L('Specialutrustning', 'Special equipment'), `
+      <p class="hint ss-lead">${L('Utöver spis, ugn, stekpannor, kastruller och stavmixer.', 'Beyond hob, oven, pans, saucepans and a stick blender.')}</p>
+      ${groups(OPT.equipment, v => chip('equipment', v))}
+      ${P.customEquipment.length ? `<div class="chips">${P.customEquipment.map(v => `<button type="button" class="chip opt" data-premove="${esc(v)}" aria-pressed="true" title="${L('Tryck för att ta bort', 'Tap to remove')}">${esc(v)} ×</button>`).join('')}</div>` : ''}
+      <div class="add-row"><input id="equipNew" placeholder="${L('Lägg till egen, t.ex. Plancha', 'Add your own, e.g. Plancha')}" aria-label="${L('Egen utrustning', 'Your own equipment')}"><button class="ghost" data-equipadd>${L('Lägg till', 'Add')}</button></div>`),
+    sec('bread', L('Bakning av bröd', 'Bread baking'), `
+      <p class="hint ss-lead">${L('Det ni lämnar tomt väljer souschefen efter receptet.', 'Whatever you leave empty, the sous-chef picks to suit the recipe.')}</p>
+      <div class="opt-group"><h3>${L('Jäsmedel', 'Leavening')}</h3><div class="chips">${BREAD_OPT.leaven.map(v => chip('breadLeaven', v)).join('')}<button type="button" class="chip opt" data-pbool="breadStarter" aria-pressed="${P.breadStarter}">${L('Levande surdegsgrund', 'Live sourdough starter')}</button></div></div>
+      <div class="sel-grid">${sel('breadProof', L('Jäsning', 'Proofing'), BREAD_OPT.proof)}${sel('breadKnead', L('Knådning', 'Kneading'), BREAD_OPT.knead)}${sel('breadHydration', L('Degens fuktighet', 'Dough hydration'), BREAD_OPT.hydration)}</div>
       <div class="opt-group"><h3>${L('Mjöl vi gillar', 'Flours we like')}</h3><div class="chips">${BREAD_OPT.flour.map(v => chip('breadFlour', v)).join('')}</div></div>
       <div class="opt-group"><h3>${L('Gräddning', 'Baking')}</h3><div class="chips">${BREAD_OPT.bake.map(v => chip('breadBake', v)).join('')}</div></div>
-      <div class="field"><label for="breadNote">${L(`Övrigt om bakning`, `More about baking`)}</label><textarea id="breadNote" data-ptext="breadNote" rows="2" style="min-height:70px" placeholder="${L('T.ex. gärna frön, ljus skorpa, bakar mest på helgen', 'E.g. seeds welcome, light crust, mostly bake at weekends')}">${esc(P.breadNote)}</textarea></div>
-    </div>`;
+      <div class="field"><label for="breadNote">${L('Övrigt om bakning', 'More about baking')}</label><textarea id="breadNote" data-ptext="breadNote" rows="2" class="short" placeholder="${L('T.ex. gärna frön, ljus skorpa', 'E.g. seeds welcome, light crust')}">${esc(P.breadNote)}</textarea></div>`),
+  ].join('');
 }
 
 /* ============ Introduktion för nya familjer ============ */
@@ -1486,51 +1489,44 @@ function viewSettings() {
   const keyField = p === 'claude' ? 'claudeKey' : 'geminiKey';
   const ai = S.aiStatus || (s[keyField] ? '' : L('Ingen nyckel ännu', 'No key yet'));
   const sync = !s.ghToken ? L('Av – kokboken finns bara på den här enheten', 'Off – the cookbook is only on this device') : (S.sync.state === 'Synkad' ? `✓ ${L('På', 'On')} – ${$('#sync').title || tv('Synkad').toLowerCase()}` : tv(S.sync.state) || L('Kopplar…', 'Connecting…'));
-  return `<section class="settings">
-    <h1>${L('Inställningar', 'Settings')}</h1>
-
-    <div class="card">
-      <h2>Språk / Language</h2>
-      ${langPicker()}
-      <p class="hint" style="margin-top:10px">${L('Gäller appen på den här enheten och nya svar från souschefen. Sparade recept behåller sitt språk. Be souschefen översätta dem i chatten vid behov.', 'Applies to the app on this device and new answers from the sous-chef. Saved recipes keep their language. Ask the sous-chef in the chat to translate one if needed.')}</p>
-    </div>
-
-${prefsCards()}
-
-    <div class="card">
-      <h2>${L('Smakminne', 'Taste memory')}</h2>
-      <p>${L(`Saker souschefen har lärt sig av era samtal. Ta bort det som inte stämmer, eller lägg till själv.`, `Things the sous-chef has learned from your conversations. Remove what is wrong, or add your own.`)}</p>
-      ${mem.length ? `<ul class="memory-list">${mem.map(m => `<li><span>${esc(m.text)}</span><button class="ghost small" data-forget="${m.id}">${L('Ta bort', 'Remove')}</button></li>`).join('')}</ul>` : `<p class="muted">${L('Inget ännu.', 'Nothing yet.')}</p>`}
-      <div class="row"><input id="memNew" class="search" placeholder="${L('T.ex. Vi älskar sambal', 'E.g. We love sambal')}" style="max-width:none"><button class="ghost" data-memadd>${L('Lägg till', 'Add')}</button></div>
-    </div>
-
-    ${window.Cloud?.configured() ? Cloud.accountCard() : `<div class="card">
-      <h2>${L('Koppling', 'Connection')}</h2>
-      <p>${L(`Görs en gång per enhet. Nycklarna sparas bara i webbläsaren.`, `Done once per device. Keys are saved only in the browser.`)}</p>
+  const connection = `
+      <p class="hint ss-lead">${L('Görs en gång per enhet. Nycklarna sparas bara i webbläsaren.', 'Done once per device. Keys are saved only in the browser.')}</p>
       <div class="field"><label for="${keyField}">${p === 'claude' ? L('Claude-nyckel', 'Claude key') : L('Gemini-nyckel (gratis)', 'Gemini key (free)')}</label>
         <input id="${keyField}" type="password" autocomplete="off" value="${esc(s[keyField])}" placeholder="${L('Klistra in nyckeln', 'Paste the key')}">
         <span class="hint">${p === 'claude' ? L('Från', 'From') + ' <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.' : L('Hämtas på', 'Get it at') + ' <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.'}${ai ? ` <strong class="status-line">${esc(ai)}</strong>` : ''}</span></div>
       <div class="field"><label for="ghToken">${L('GitHub-token för att dela kokboken', 'GitHub token to share the cookbook')} <span class="muted">(${L('valfritt', 'optional')})</span></label>
         <input id="ghToken" type="password" autocomplete="off" value="${esc(s.ghToken)}" placeholder="ghp_…">
-        <span class="hint">${L('Behövs bara om fler enheter ska se samma kokbok.', 'Only needed if more devices should see the same cookbook.')} <a href="https://github.com/settings/tokens/new?scopes=gist&description=Souschefen" target="_blank" rel="noopener">${L('Skapa token', 'Create token')}</a> (${L('bara behörigheten', 'only the permission')} "gist"). <strong class="status-line">${esc(sync)}</strong></span></div>
+        <span class="hint"><a href="https://github.com/settings/tokens/new?scopes=gist&description=Souschefen" target="_blank" rel="noopener">${L('Skapa token', 'Create token')}</a> (${L('bara behörigheten', 'only the permission')} "gist"). <strong class="status-line">${esc(sync)}</strong></span></div>
       <div class="row"><button class="btn" data-connect>${L('Spara och testa', 'Save and test')}</button>
         ${s[keyField] ? `<button class="ghost" data-sharelink>${L('Kopiera länk till annan enhet', 'Copy link to another device')}</button>` : ''}</div>
-      ${s[keyField] ? `<p class="hint muted" style="margin:10px 0 0;font-size:14px">${L(`Öppna länken på mobilen eller plattan så kopplas den automatiskt. Länken innehåller nycklarna – skicka den bara till er själva.`, `Open the link on your phone or tablet and it connects automatically. The link contains your keys – only send it to yourselves.`)}</p>` : ''}
-    </div>`}
-
-    <details class="card adv">
-      <summary><h2>${L('Avancerat', 'Advanced')}</h2></summary>
+      ${s[keyField] ? `<p class="hint" style="margin:10px 0 0">${L('Länken innehåller nycklarna. Skicka den bara till er själva.', 'The link contains your keys. Only send it to yourselves.')}</p>` : ''}`;
+  const advanced = `
+      <div class="field"><label>${L('Tema', 'Theme')}</label><div class="seg" role="group">${[['auto', L('Som enheten', 'Match device')], ['light', L('Ljust', 'Light')], ['dark', L('Mörkt', 'Dark')]].map(([k, l]) => `<button type="button" data-theme="${k}" aria-pressed="${s.theme === k}">${l}</button>`).join('')}</div></div>
       <div class="field"><label>${L('AI-tjänst', 'AI service')}</label>
         <div class="seg" role="group"><button type="button" data-prov="gemini" aria-pressed="${p === 'gemini'}">Google Gemini</button><button type="button" data-prov="claude" aria-pressed="${p === 'claude'}">Anthropic Claude</button></div></div>
       <div class="field"><label for="${p === 'claude' ? 'claudeModel' : 'geminiModel'}">${L('Modell', 'Model')}</label><input id="${p === 'claude' ? 'claudeModel' : 'geminiModel'}" value="${esc(p === 'claude' ? s.claudeModel : s.geminiModel)}">
         <span class="hint">${L('Standard', 'Default')}: ${DEFAULT_MODELS[p]}.${p === 'gemini' ? L(' Är modellen upptagen provar appen andra gratismodeller automatiskt.', ' If the model is busy, the app tries other free models automatically.') : ''}</span></div>
       <div class="field"><label for="gistId">${L('Gist-id för delad kokbok', 'Gist ID for shared cookbook')}</label><input id="gistId" value="${esc(s.gistId)}" placeholder="${L('Hittas eller skapas automatiskt', 'Found or created automatically')}"></div>
       <div class="row" style="margin-bottom:18px"><button class="ghost" data-savekeys>${L('Spara', 'Save')}</button>${s.gistId ? `<button class="ghost" data-syncnow>${L('Synka nu', 'Sync now')}</button>` : ''}</div>
-      <div class="field"><label>${L('Tema', 'Theme')}</label><div class="seg" role="group">${[['auto', L('Som enheten', 'Match device')], ['light', L('Ljust', 'Light')], ['dark', L('Mörkt', 'Dark')]].map(([k, l]) => `<button type="button" data-theme="${k}" aria-pressed="${s.theme === k}">${l}</button>`).join('')}</div></div>
-      <div class="row" style="margin-bottom:12px"><button class="ghost" data-showwelcome>${L('Visa introduktionen igen', 'Show the introduction again')}</button></div>
-      <div class="row"><button class="ghost" data-export>${L('Ladda ner säkerhetskopia', 'Download backup')}</button>
-        <label class="ghost">${L('Läs in säkerhetskopia', 'Restore backup')}<input type="file" accept="application/json" id="importFile" hidden></label></div>
-    </details>
+      <div class="row"><button class="ghost" data-showwelcome>${L('Visa introduktionen igen', 'Show the introduction again')}</button>
+        <button class="ghost" data-export>${L('Ladda ner säkerhetskopia', 'Download backup')}</button>
+        <label class="ghost">${L('Läs in säkerhetskopia', 'Restore backup')}<input type="file" accept="application/json" id="importFile" hidden></label></div>`;
+  return `<section class="settings">
+    <h1>${L('Inställningar', 'Settings')}</h1>
+    <h2 class="set-group">${L('Matlagning', 'Cooking')}</h2>
+    <div class="set-list">
+      ${prefsSections()}
+      ${sec('memory', L('Smakminne', 'Taste memory'), `
+      <p class="hint ss-lead">${L('Det souschefen lärt sig av era samtal.', 'What the sous-chef has learned from your conversations.')}</p>
+      ${mem.length ? `<ul class="memory-list">${mem.map(m => `<li><span>${esc(m.text)}</span><button class="ghost small" data-forget="${m.id}">${L('Ta bort', 'Remove')}</button></li>`).join('')}</ul>` : ''}
+      <div class="add-row"><input id="memNew" placeholder="${L('T.ex. Vi älskar sambal', 'E.g. We love sambal')}" aria-label="${L('Ny sak att minnas', 'New thing to remember')}"><button class="ghost" data-memadd>${L('Lägg till', 'Add')}</button></div>`)}
+    </div>
+    <h2 class="set-group">${L('App och konto', 'App and account')}</h2>
+    <div class="set-list">
+      <div class="set-row"><span class="ss-title">Språk / Language</span>${langPicker()}</div>
+      ${sec('account', window.Cloud?.configured() ? L('Konto och familj', 'Account and family') : L('Koppling', 'Connection'), window.Cloud?.configured() ? Cloud.accountCard() : connection)}
+      ${sec('advanced', L('Avancerat', 'Advanced'), advanced)}
+    </div>
   </section>`;
 }
 
@@ -1552,6 +1548,7 @@ function bindStage() {
       const v = $('#homeInput').value, isLink = /https?:\/\/\S+/.test(v), isPaste = v.length > 250 && v.split('\n').length > 4;
       $('#askBtn').textContent = isLink || isPaste ? L('Renskriv receptet', 'Clean up the recipe') : L('Ge oss förslag', 'Give us suggestions');
       const lh = isLink ? (() => { try { return new URL(v.match(/https?:\/\/\S+/)[0]).hostname.replace(/^www\./, ''); } catch { return L('webben', 'the web'); } })() : '';
+      $('#askHint').hidden = !(isLink || isPaste);
       $('#askHint').textContent = isLink ? L(`🔗 Länk från ${lh} – receptet renskrivs troget med era portioner`, `🔗 Link from ${lh} – the recipe is cleaned up faithfully with your servings`) : isPaste ? L('📋 Recepttext – renskrivs med era portioner', '📋 Recipe text – cleaned up with your servings') : L('🔗 Klistra in en receptlänk så renskrivs receptet med era portioner', '🔗 Paste a recipe link to have it cleaned up with your servings');
     };
     $('#homeInput').addEventListener('input', updAsk);
@@ -1569,6 +1566,7 @@ function bindStage() {
   st.querySelectorAll('[data-ptext]').forEach(el => {
     el.oninput = debounce(() => { const k = el.dataset.ptext; if (k === 'profile') S.data.profile = el.value; else S.data.prefs[k] = el.value; prefsChanged(true); }, 500);
   });
+  st.querySelectorAll('[data-psel]').forEach(el => { el.onchange = () => { S.data.prefs[el.dataset.psel] = el.value; prefsChanged(); }; });
   const imp = $('#importFile', st);
   if (imp) imp.onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
@@ -1576,6 +1574,10 @@ function bindStage() {
     catch { toast(L('Filen kunde inte läsas som en kokbok', 'The file could not be read as a cookbook')); }
   };
 }
+$('#stage').addEventListener('toggle', e => {
+  const d = e.target;
+  if (d.matches && d.matches('details[data-sec]')) { (S.openSecs ||= new Set())[d.open ? 'add' : 'delete'](d.dataset.sec); }
+}, true);
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const savedRecipe = () => S.current.recipeSavedId && S.data.recipes.find(x => x.id === S.current.recipeSavedId);
 const touch = r => { r.updatedAt = now(); };
@@ -1656,7 +1658,7 @@ $('#stage').addEventListener('click', async e => {
   const pr = t.closest('[data-premove]');
   if (pr) { const P = S.data.prefs; P.customEquipment = P.customEquipment.filter(x => x !== pr.dataset.premove); prefsChanged(); renderStage(); return; }
   if (t.closest('[data-equipadd]')) { const v = $('#equipNew').value.trim(); if (v) { S.data.prefs.customEquipment.push(v); prefsChanged(); renderStage(); } return; }
-  if (t.closest('[data-status]')) { toggleStatusPop(true); return; }
+  if (t.closest('[data-status]')) { e.stopPropagation(); toggleStatusPop(true); return; }
 
   // Inställningar
   const prov = t.closest('[data-prov]');
@@ -1745,6 +1747,7 @@ function saveRecipe() {
 
 function prefsChanged(quiet) {
   S.data.textUpdatedAt = now(); saveData(); renderStatus();
+  if (S.route.view === 'settings') refreshSummaries();
   if (!quiet) { clearTimeout(prefsChanged._t); prefsChanged._t = setTimeout(() => toast(L('Sparat', 'Saved')), 400); }
 }
 

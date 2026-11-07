@@ -233,17 +233,15 @@ window.Cloud = (() => {
   function accountCard() {
     const F = C.family || {}, code = F.joinCode || '';
     const ai = S.aiStatus || (C.key ? '' : L('Ingen nyckel ännu', 'No key yet'));
-    return `<div class="card">
-      <h2>${L('Konto och familj', 'Account and family')}</h2>
-      <p>${L('Inloggad som', 'Signed in as')} <strong>${esc(C.user?.email || '')}</strong>${F.name ? ` ${L('i', 'in')} <strong>${esc(F.name)}</strong>` : ''}${F.members ? ` (${F.members.length} ${F.members.length === 1 ? L('medlem', 'member') : L('medlemmar', 'members')})` : ''}. ${L('Allt sparas i familjens konto och syns direkt på alla era enheter.', 'Everything is saved in the family account and shows up right away on all your devices.')}</p>
+    return `
+      <p class="hint ss-lead">${L('Inloggad som', 'Signed in as')} <strong>${esc(C.user?.email || '')}</strong>${F.name ? ` ${L('i', 'in')} <strong>${esc(F.name)}</strong>` : ''}${F.members ? ` (${F.members.length} ${F.members.length === 1 ? L('medlem', 'member') : L('medlemmar', 'members')})` : ''}. ${L('Allt sparas i familjens konto och syns på alla era enheter.', 'Everything is saved in the family account and shows up on all your devices.')}</p>
       ${code ? `<div class="field"><label>${L('Bjud in familjen', 'Invite the family')}</label>
         <div class="row"><span class="fam-code">${prettyCode(code)}</span><button class="ghost" data-invite>${L('Kopiera inbjudan', 'Copy invitation')}</button></div>
-        <span class="hint">${L(`Den som öppnar inbjudan och loggar in med sitt Google-konto kommer med i familjen. Ni loggar in med samma konto på era egna enheter.`, `Anyone who opens the invitation and signs in with their Google account joins the family. Use the same account on your own devices.`)}</span></div>` : ''}
+        <span class="hint">${L('Den som öppnar inbjudan och loggar in med Google kommer med i familjen.', 'Anyone who opens the invitation and signs in with Google joins the family.')}</span></div>` : ''}
       <div class="field"><label for="famKey">${L('Gemini-nyckel för familjen', 'Gemini key for the family')}</label>
         <input id="famKey" type="password" autocomplete="off" value="${esc(C.key)}" placeholder="${L('Klistra in nyckeln', 'Paste the key')}">
         <span class="hint">${L('Läggs in en gång och gäller alla i familjen. Hämtas gratis på', 'Added once and works for everyone in the family. Get it for free at')} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.${ai ? ` <strong class="status-line">${esc(ai)}</strong>` : ''}</span></div>
-      <div class="row"><button class="btn" data-famkey>${L('Spara och testa', 'Save and test')}</button><button class="ghost" data-signout>${L('Logga ut', 'Sign out')}</button></div>
-    </div>`;
+      <div class="row"><button class="btn" data-famkey>${L('Spara och testa', 'Save and test')}</button><button class="ghost" data-signout>${L('Logga ut', 'Sign out')}</button></div>`;
   }
 
   /* ---------- Klick ---------- */
