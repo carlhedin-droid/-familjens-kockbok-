@@ -728,3 +728,7 @@ a.howto { text-decoration: none; color: var(--ink); }
 .b-look { font-size: 14px; }
 .b-look b { font-weight: 700; }
 .dr-price { margin: 10px 0 0; max-width: 64ch; }
+
+.sb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.sb-chip { font-size: 13.5px; font-weight: 700; color: var(--pandan); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; background: var(--bg); }
+.sb-chip:hover { border-color: var(--pandan); }

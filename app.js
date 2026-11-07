@@ -18,6 +18,7 @@ const EN_VALUES = {
   'Färsk jäst': 'Fresh yeast', 'Torrjäst': 'Dry yeast', 'Surdeg': 'Sourdough', 'Förjäsning (poolish/biga)': 'Pre-ferment (poolish/biga)',
   'Vetemjöl': 'Wheat flour', 'Rågmjöl': 'Rye flour', 'Dinkel': 'Spelt', 'Fullkorn': 'Whole grain', 'Durum': 'Durum', 'Ölandsvete': 'Öland wheat',
   'Under 120 kr': 'Under SEK 120', '120–200 kr': 'SEK 120–200', '200–350 kr': 'SEK 200–350', 'Över 350 kr': 'Over SEK 350',
+  'Mjukt & bärigt': 'Soft & berry', 'Fruktigt & smakrikt': 'Fruity & flavourful', 'Kryddigt & mustigt': 'Spicy & robust', 'Stramt & nyanserat': 'Firm & nuanced', 'Friskt & fruktigt': 'Fresh & fruity', 'Fylligt & smakrikt': 'Full & flavourful', 'Torrt': 'Dry',
   'Bakstål': 'Baking steel', 'Ånga i ugnen': 'Steam in the oven', 'Plåt': 'Baking tray', 'Form': 'Loaf tin',
   'Efter receptet': 'Follow the recipe', 'Samma dag': 'Same day', 'Över natten i kyl': 'Overnight in the fridge', '1–3 dygn i kyl': '1–3 days in the fridge',
   'För hand': 'By hand', 'Degblandare': 'Dough mixer', 'Utan knådning, vik degen': 'No-knead, fold the dough',
@@ -57,7 +58,7 @@ function setLang(lang) {
   applyStaticLang(); renderStatus(); renderStage(); renderChat(); renderAttach(); tickTimers();
   const el = $('#sync'); if (el) el.textContent = tv(S.sync.state || '');
 }
-const ENGLISH_RULE = `- LANGUAGE: The app is set to English. Keep "howTo" search terms in English. Write everything the user sees in natural English: "reply", all recipe and suggestion text (title, origin, intro, step titles, overview, activeTime, ahead, ingredient names, groups and swaps, steps, health, tips, troubleshoot, serveWith, storage, drinks (why, priceTip, option title, lookFor and why, nonAlcoholic title and why; keep kind, taste, grape and country values exactly as specified – taste slugs, grape and country names stay Swedish/as on Systembolaget), why, keyIngredients, equipment) and "learn". This overrides the Swedish examples above, and the instructions being in Swedish does not change it. Use g, kg, ml, l, tbsp and tsp, and "Easy", "Medium" or "Advanced" for "difficulty". Keep "tag" exactly VARDAG or HELG (VARDAG means weekday, HELG means weekend). Family notes may be in Swedish; understand them and answer in English. If a recipe on screen or at a link is in Swedish or another language, translate it when you send it. If information is missing: ask in "reply" and set suggestions/recipe to null.`;
+const ENGLISH_RULE = `- LANGUAGE: The app is set to English. Keep "howTo" search terms in English. Write everything the user sees in natural English: "reply", all recipe and suggestion text (title, origin, intro, step titles, overview, activeTime, ahead, ingredient names, groups and swaps, steps, health, tips, troubleshoot, serveWith, storage, drinks (why, priceTip, option title, lookFor and why, nonAlcoholic title and why; keep kind, taste, food, grape, country and region values exactly as specified – taste slugs, grape and country names stay Swedish/as on Systembolaget), why, keyIngredients, equipment) and "learn". This overrides the Swedish examples above, and the instructions being in Swedish does not change it. Use g, kg, ml, l, tbsp and tsp, and "Easy", "Medium" or "Advanced" for "difficulty". Keep "tag" exactly VARDAG or HELG (VARDAG means weekday, HELG means weekend). Family notes may be in Swedish; understand them and answer in English. If a recipe on screen or at a link is in Swedish or another language, translate it when you send it. If information is missing: ask in "reply" and set suggestions/recipe to null.`;
 const langRule = () => FORMAT_RULES.replace('- Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.', L('- Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.', ENGLISH_RULE));
 
 /* ============ Standardtexter ============ */
@@ -239,7 +240,7 @@ const BREAD_OPT = {
   hydration: [['', 'Efter receptet'], ['fast', 'Fast, ca 60–65 %'], ['mellan', 'Mellan, ca 65–75 %'], ['hog', 'Hög, över 75 %']],
 };
 const DRINK_PRICES = [['budget', 'Under 120 kr'], ['mellan', '120–200 kr'], ['bra', '200–350 kr'], ['fest', 'Över 350 kr']];
-const DRINK_DEFAULTS = { drinkPrice: 'mellan', drinkNA: true, drinkWeekday: false };
+const DRINK_DEFAULTS = { drinkPrice: 'mellan', drinkNA: true, drinkWeekday: false, drinkEco: false, drinkGlass: false };
 const BREAD_DEFAULTS = { breadLeaven: [], breadStarter: false, breadProof: '', breadKnead: '', breadHydration: '', breadFlour: [], breadBake: [], breadNote: '' };
 const CARL_PREFS = {
   portions: 4, bigEaters: true, foodieAdded: true,
@@ -290,7 +291,8 @@ const RESPONSE_SCHEMA = {
       serveWith: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: S_STR, why: S_STRN }, required: ['name'] } },
       storage: { type: 'OBJECT', nullable: true, properties: { fridge: S_STRN, freezer: S_STRN, leftovers: S_STRN } },
       drinks: { type: 'OBJECT', nullable: true, properties: { why: S_STR, priceTip: S_STRN,
-        options: { type: 'ARRAY', items: { type: 'OBJECT', properties: { title: S_STR, kind: S_STR, taste: S_STRN, grape: S_STRN, country: S_STRN, lookFor: S_STRN, why: S_STRN }, required: ['title', 'kind'] } },
+        food: S_STRN,
+        options: { type: 'ARRAY', items: { type: 'OBJECT', properties: { title: S_STR, kind: S_STR, taste: S_STRN, grape: S_STRN, country: S_STRN, region: S_STRN, lookFor: S_STRN, why: S_STRN }, required: ['title', 'kind'] } },
         nonAlcoholic: { type: 'OBJECT', nullable: true, properties: { title: S_STR, kind: S_STRN, why: S_STRN }, required: ['title'] } }, required: ['why'] } },
       required: ['title', 'ingredients', 'steps'] },
     learn: S_ARR,
@@ -318,7 +320,8 @@ Du svarar inuti en app. Svara ALLTID med exakt ett JSON-objekt – ingen text f�
     "serveWith": [ { "name": "Gurkraita", "why": "svalkar hettan" } ],
     "storage": { "fridge": "3 dagar", "freezer": "3 månader, utan grädden" | null, "leftovers": "Fyll wraps med resterna" | null },
     "drinks": { "why": "Tomatens syra kräver syra i glaset, och chilin gör strävt vin bittert.",
-      "options": [ { "title": "Syrligt, bärigt rött", "kind": "rott", "taste": "mjukt-barigt", "grape": "Barbera" | null, "country": "Italien" | null, "lookFor": "Fruktsyra 8–10, strävhet under 6", "why": "Syran möter tomaten" } ],
+      "food": "pasta" | null,
+      "options": [ { "title": "Syrligt, bärigt rött", "kind": "rott", "taste": "mjukt-barigt", "grape": "Barbera" | null, "country": "Italien" | null, "region": "Piemonte" | null, "lookFor": "Fruktsyra 8–10, strävhet under 6", "why": "Syran möter tomaten" } ],
       "priceTip": "Under 120 kr: Piemonte och Sicilien ger mer än Toscana" | null,
       "nonAlcoholic": { "title": "Alkoholfritt mousserande", "kind": "alkoholfritt-mousserande", "why": "Friskt mot det feta" } | null } | null
   },
@@ -342,6 +345,8 @@ Regler:
       - "taste": Systembolagets smakstil. Rött: mjukt-barigt, fruktigt-smakrikt, kryddigt-mustigt, stramt-nyanserat. Vitt: friskt-fruktigt, fylligt-smakrikt. Rosé: fruktigt-smakrikt. Mousserande: torrt-vitt. Annars null.
       - "grape": EN druva som den heter på Systembolaget (t.ex. "Riesling", "Pinot noir", "Sangiovese"), eller null om flera passar lika bra.
       - "country": ett land på svenska (t.ex. "Italien"), eller null.
+      - "region": ett område inom landet om det tydligt passar bäst (t.ex. "Piemonte", "Bourgogne", "Rioja", "Mosel"), annars null.
+    - "food": Systembolagets matsymbol som bäst beskriver rätten: aperitif, asiatiskt, buffemat, fisk, flask, fagel, gronsaker, kryddstarkt, lamm, not, ost, pasta, pizza, grillat, skaldjur eller vilt. Annars null.
       - "lookFor": druvor eller områden och smakklockor (fyllighet, strävhet, fruktsyra, sötma, skala 1–12).
     - "priceTip": var det finns mest för pengarna i vår prisklass.
     - "nonAlcoholic": om inställningen säger det; "kind" är alkoholfritt-rott, alkoholfritt-vitt, alkoholfritt-mousserande, alkoholfri-ol eller annat (hemgjort).
@@ -931,9 +936,9 @@ function normalizeRecipe(r) {
   const st = r.storage && typeof r.storage === 'object' ? { fridge: str(r.storage.fridge), freezer: str(r.storage.freezer), leftovers: str(r.storage.leftovers) } : null;
   r.storage = st && (st.fridge || st.freezer || st.leftovers) ? st : null;
   const dr = r.drinks && typeof r.drinks === 'object' ? r.drinks : null;
-  const opt = o => o && str(o.title) ? { title: str(o.title), kind: str(o.kind), taste: str(o.taste), grape: str(o.grape), country: str(o.country), lookFor: str(o.lookFor), why: str(o.why) } : null;
+  const opt = o => o && str(o.title) ? { title: str(o.title), kind: str(o.kind), taste: str(o.taste), grape: str(o.grape), country: str(o.country), region: str(o.region), lookFor: str(o.lookFor), why: str(o.why) } : null;
   if (!dr) r.drinks = null;
-  else if (str(dr.why)) r.drinks = { why: str(dr.why), priceTip: str(dr.priceTip), options: arr(dr.options).map(opt).filter(Boolean).slice(0, 3),
+  else if (str(dr.why)) r.drinks = { why: str(dr.why), priceTip: str(dr.priceTip), food: str(dr.food), options: arr(dr.options).map(opt).filter(Boolean).slice(0, 3),
     nonAlcoholic: dr.nonAlcoholic && typeof dr.nonAlcoholic === 'object' ? opt({ ...dr.nonAlcoholic, kind: dr.nonAlcoholic.kind || 'annat' }) : (str(dr.nonAlcoholic) ? { title: str(dr.nonAlcoholic), kind: 'annat' } : null) };
   else if (str(dr.style)) r.drinks = { why: str(dr.style), priceTip: null,  // äldre format: stil + sökord, flaskor slängs
     options: str(dr.lookFor) || str(dr.searchTerm) ? [{ title: str(dr.searchTerm) || L('Passande stil', 'Matching style'), kind: null, taste: null, grape: null, country: null, lookFor: str(dr.lookFor), why: null, text: str(dr.searchTerm) }] : [],
@@ -1344,41 +1349,54 @@ const SB_TASTE = { rott: ['mjukt-barigt', 'fruktigt-smakrikt', 'kryddigt-mustigt
 const SB_COUNTRY = { italien: 'italien', frankrike: 'frankrike', spanien: 'spanien', portugal: 'portugal', tyskland: 'tyskland', osterrike: 'osterrike', grekland: 'grekland', ungern: 'ungern',
   sverige: 'sverige', usa: 'usa', chile: 'chile', argentina: 'argentina', sydafrika: 'sydafrika', australien: 'australien', 'nya zeeland': 'nya-zeeland' };
 const fold = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/-/g, ' ').trim();
-// Returnerar { url, label } – filtrerad sortimentslänk om typen är känd, annars fritextsökning
-function sbLink(o) {
-  const base = SB_KIND[o.kind];
-  if (!base) return { url: sbSearch(o.text || [o.grape, o.title].filter(Boolean).join(' ')), filtered: false };
-  const wine = SB_TASTE[o.kind] !== undefined;
-  const taste = wine && SB_TASTE[o.kind].includes(o.taste) ? o.taste : '';
-  const country = wine && SB_COUNTRY[fold(o.country)] ? SB_COUNTRY[fold(o.country)] : '';
-  // Druva + smakstil kan bli för smalt – med druva filtreras bara typ och druva
-  const grape = wine && o.grape && /^[\p{L}][\p{L} '\-]{1,30}$/u.test(o.grape) ? o.grape.trim() : '';
-  const path = grape ? [base] : [base, taste, taste && country].filter(Boolean);
-  return { url: `${SB}/sortiment/${path.join('/')}/${grape ? `?druva=${encodeURIComponent(grape)}` : ''}`, filtered: true, grape, taste: grape ? '' : taste, country: grape ? '' : country };
-}
-// Etikett från de värden som faktiskt hamnade i länken (redan vitlistade), alltid escapad
 const TASTE_LABEL = { 'mjukt-barigt': 'Mjukt & bärigt', 'fruktigt-smakrikt': 'Fruktigt & smakrikt', 'kryddigt-mustigt': 'Kryddigt & mustigt', 'stramt-nyanserat': 'Stramt & nyanserat', 'friskt-fruktigt': 'Friskt & fruktigt', 'fylligt-smakrikt': 'Fylligt & smakrikt', 'torrt-vitt': 'Torrt' };
 const COUNTRY_LABEL = { osterrike: 'Österrike', 'nya-zeeland': 'Nya Zeeland', usa: 'USA', sydafrika: 'Sydafrika' };
-const linkLabel = ln => {
-  const country = ln.country ? (COUNTRY_LABEL[ln.country] || ln.country.charAt(0).toUpperCase() + ln.country.slice(1)) : '';
-  const bits = [ln.grape, ln.taste ? tv(TASTE_LABEL[ln.taste]).toLowerCase() : '', tv(country)].filter(Boolean).map(esc);
-  return bits.length ? L(`Visa ${bits.join(', ')} på Systembolaget`, `Show ${bits.join(', ')} at Systembolaget`) : L('Visa på Systembolaget', 'Show at Systembolaget');
-};
+// Matsymboler och områden (sökvägar sedda hos Systembolaget, t.ex. /rott-vin/kryddigt-mustigt/fagel/ och /rott-vin/italien/toscana/)
+const SB_FOOD = { aperitif: 'Apéritif', asiatiskt: 'Asiatiskt', buffemat: 'Buffémat', fisk: 'Fisk', flask: 'Fläsk', fagel: 'Fågel', gronsaker: 'Grönsaker', kryddstarkt: 'Kryddstarkt',
+  lamm: 'Lamm', not: 'Nötkött', ost: 'Ost', pasta: 'Pasta', pizza: 'Pizza', grillat: 'Grillat', skaldjur: 'Skaldjur', vilt: 'Vilt' };
+const SB_REGION = { italien: { piemonte: 'piemonte', toscana: 'toscana', venetien: 'venetien', veneto: 'venetien', sicilien: 'sicilien', apulien: 'apulien', puglia: 'apulien' },
+  frankrike: { bourgogne: 'bourgogne', bordeaux: 'bordeaux', alsace: 'alsace', champagne: 'champagne' }, spanien: { rioja: 'rioja' }, tyskland: { mosel: 'mosel', pfalz: 'pfalz' } };
+const EN_FOOD = { 'Apéritif': 'aperitif', 'Asiatiskt': 'Asian food', 'Buffémat': 'buffet', 'Fisk': 'fish', 'Fläsk': 'pork', 'Fågel': 'poultry', 'Grönsaker': 'vegetables', 'Kryddstarkt': 'spicy food',
+  'Lamm': 'lamb', 'Nötkött': 'beef', 'Ost': 'cheese', 'Pasta': 'pasta', 'Pizza': 'pizza', 'Grillat': 'grilled food', 'Skaldjur': 'shellfish', 'Vilt': 'game' };
+// Bygger länkar: huvudlänk (typ + smakstil + land/område), plus "till maten" och druva som egna länkar – allt på en gång blir ofta en tom lista
+function sbLinks(o, dr) {
+  const base = SB_KIND[o.kind];
+  if (!base) return { main: { url: sbSearch(o.text || [o.grape, o.title].filter(Boolean).join(' ')), label: L('Sök på Systembolaget', 'Search Systembolaget') }, extra: [] };
+  const wine = SB_TASTE[o.kind] !== undefined, P = S.data.prefs;
+  const taste = wine && SB_TASTE[o.kind].includes(o.taste) ? o.taste : '';
+  const country = wine ? SB_COUNTRY[fold(o.country)] || '' : '';
+  const region = country && SB_REGION[country] ? SB_REGION[country][fold(o.region)] || '' : '';
+  const food = wine && SB_FOOD[dr?.food] ? dr.food : '';
+  const grape = wine && o.grape && /^[\p{L}][\p{L} '\-]{1,30}$/u.test(o.grape) ? o.grape.trim() : '';
+  const prefs = wine ? [P.drinkGlass && 'glasflaska', P.drinkEco && 'ekologiskt'].filter(Boolean) : [];
+  const url = (segs, q = '') => `${SB}/sortiment/${[base, ...segs, ...prefs].filter(Boolean).join('/')}/${q}`;
+  const cLabel = country ? (COUNTRY_LABEL[country] || country.charAt(0).toUpperCase() + country.slice(1)) : '';
+  const rLabel = region ? o.region.trim() : '';
+  const where = rLabel || tv(cLabel);
+  const tasteL = taste ? tv(TASTE_LABEL[taste]).toLowerCase() : '';
+  const mainBits = [tasteL, where].filter(Boolean).map(esc);
+  const main = { url: url([taste, country, region]), label: mainBits.length ? L(`Visa ${mainBits.join(' från ')} på Systembolaget`, `Show ${mainBits.join(' from ')} at Systembolaget`) : L('Visa på Systembolaget', 'Show at Systembolaget') };
+  const extra = [];
+  if (food) extra.push({ url: url([taste, food]), label: L(`Till ${SB_FOOD[food].toLowerCase()}`, `For ${EN_FOOD[SB_FOOD[food]]}`) });
+  if (grape) extra.push({ url: url([], `?druva=${encodeURIComponent(grape)}`), label: L(`Druva: ${esc(grape)}`, `Grape: ${esc(grape)}`) });
+  return { main, extra };
+}
 function drinksBlock(r) {
   const dr = r.drinks;
   if (!dr) return `<div class="enrich"><button class="ghost" data-drinks>🍷 ${L('Föreslå dryck till maten', 'Suggest a drink')}</button></div>`;
-  const card = o => { const ln = sbLink(o); return `<div class="drink">
+  const card = o => { const ln = sbLinks(o, dr); return `<div class="drink">
       <strong>${esc(o.title)}</strong>
       ${o.why ? `<span class="b-why">${esc(o.why)}</span>` : ''}
       ${o.lookFor ? `<span class="b-look"><b>${L('Leta efter', 'Look for')}:</b> ${esc(o.lookFor)}</span>` : ''}
-      ${o.kind !== 'annat' ? `<span class="b-links"><a href="${ln.url}" target="_blank" rel="noopener">${ln.filtered ? linkLabel(ln) : L('Sök på Systembolaget', 'Search Systembolaget')}</a>${ln.grape ? ` <a class="b-alt" href="${sbSearch(ln.grape)}" target="_blank" rel="noopener">${L('Fritext', 'Free text')}</a>` : ''}</span>` : ''}
+      ${o.kind !== 'annat' ? `<span class="b-links"><a href="${ln.main.url}" target="_blank" rel="noopener">${ln.main.label}</a></span>
+      ${ln.extra.length ? `<span class="sb-chips">${ln.extra.map(x => `<a class="sb-chip" href="${x.url}" target="_blank" rel="noopener">${x.label}</a>`).join('')}</span>` : ''}` : ''}
     </div>`; };
   return `<div class="r-extra drinks"><h3>${L('Dryck till maten', 'Drinks')}</h3>
     <p class="dr-style">${esc(dr.why)}</p>
     ${dr.options.length ? `<div class="drink-list">${dr.options.map(card).join('')}</div>` : ''}
     ${dr.priceTip ? `<p class="dr-price"><strong>${L('I din prisklass', 'In your price range')}:</strong> ${esc(dr.priceTip)}</p>` : ''}
     ${dr.nonAlcoholic ? `<h4 class="dr-sub">${L('Alkoholfritt', 'Alcohol-free')}</h4><div class="drink-list">${card(dr.nonAlcoholic)}</div>` : ''}
-    <p class="hint">${L('Länkarna öppnar Systembolagets sortiment filtrerat på typ och stil. Där kan du sortera på pris och välja flaska.', 'The links open Systembolaget\'s range filtered by type and style. Sort by price there and pick a bottle.')}</p>
+    <p class="hint">${L('Länkarna öppnar Systembolagets sortiment filtrerat på typ, stil, område och mat', 'The links open Systembolaget\'s range filtered by type, style, region and food')}${S.data.prefs.drinkEco || S.data.prefs.drinkGlass ? L(` (${[S.data.prefs.drinkEco && 'ekologiskt', S.data.prefs.drinkGlass && 'glasflaska'].filter(Boolean).join(', ')})`, ` (${[S.data.prefs.drinkEco && 'organic', S.data.prefs.drinkGlass && 'glass bottle'].filter(Boolean).join(', ')})`) : ''}. ${L('Sortera på pris där och välj flaska.', 'Sort by price there and pick a bottle.')}</p>
   </div>`;
 }
 const fmtMin = m => m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
@@ -1485,7 +1503,7 @@ function secSummary(key) {
     case 'health': return P.healthNote.trim() ? (P.healthWho.trim() ? `${P.healthWho.trim()}: ` : '') + P.healthNote.trim() : L('Inget mål', 'No goal');
     case 'cuisines': return list(P.cuisines, L('Alla kök', 'All cuisines'));
     case 'equipment': return list([...P.equipment, ...P.customEquipment], L('Vanligt kök', 'Regular kitchen'));
-    case 'drinks': return tv((DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1]) + (P.drinkNA ? L(', alkoholfritt alternativ', ', alcohol-free option') : '') + (P.drinkWeekday ? L(', även vardag', ', weekdays too') : '');
+    case 'drinks': return tv((DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1]) + (P.drinkNA ? L(', alkoholfritt alternativ', ', alcohol-free option') : '') + (P.drinkWeekday ? L(', även vardag', ', weekdays too') : '') + (P.drinkEco ? L(', ekologiskt', ', organic') : '') + (P.drinkGlass ? L(', glasflaska', ', glass bottle') : '');
     case 'bread': { const b = [...P.breadLeaven.map(tv), lab(BREAD_OPT.proof, P.breadProof), lab(BREAD_OPT.knead, P.breadKnead), lab(BREAD_OPT.hydration, P.breadHydration), ...P.breadFlour.map(tv), ...P.breadBake.map(tv)].filter(Boolean);
       return b.length ? b.join(', ') : L('Efter receptet', 'Follow the recipe'); }
     case 'memory': { const n = S.data.memory.filter(m => !m.deleted).length;
@@ -1541,7 +1559,10 @@ function prefsSections() {
       <p class="hint ss-lead">${L('Souschefen föreslår vilken typ av dryck som passar till helgens recept, med länkar till Systembolagets sortiment.', 'The sous-chef suggests what kind of drink suits weekend recipes, with links to Systembolaget\'s range.')}</p>
       <div class="sel-grid">${sel('drinkPrice', L('Pris per flaska', 'Price per bottle'), DRINK_PRICES)}</div>
       <div class="chips"><button type="button" class="chip opt" data-pbool="drinkNA" aria-pressed="${P.drinkNA}">${L('Alltid ett alkoholfritt alternativ', 'Always an alcohol-free option')}</button>
-        <button type="button" class="chip opt" data-pbool="drinkWeekday" aria-pressed="${P.drinkWeekday}">${L('Även på vardagar', 'On weekdays too')}</button></div>`),
+        <button type="button" class="chip opt" data-pbool="drinkWeekday" aria-pressed="${P.drinkWeekday}">${L('Även på vardagar', 'On weekdays too')}</button></div>
+      <div class="opt-group" style="margin-top:14px"><h3>${L('Filter i länkarna till Systembolaget', 'Filters in the Systembolaget links')}</h3><div class="chips">
+        <button type="button" class="chip opt" data-pbool="drinkEco" aria-pressed="${P.drinkEco}">${L('Bara ekologiskt', 'Organic only')}</button>
+        <button type="button" class="chip opt" data-pbool="drinkGlass" aria-pressed="${P.drinkGlass}">${L('Bara glasflaska, inte box', 'Glass bottles only, no box')}</button></div></div>`),
     sec('bread', L('Bakning av bröd', 'Bread baking'), `
       <p class="hint ss-lead">${L('Det ni lämnar tomt väljer souschefen efter receptet.', 'Whatever you leave empty, the sous-chef picks to suit the recipe.')}</p>
       <div class="opt-group"><h3>${L('Jäsmedel', 'Leavening')}</h3><div class="chips">${BREAD_OPT.leaven.map(v => chip('breadLeaven', v)).join('')}<button type="button" class="chip opt" data-pbool="breadStarter" aria-pressed="${P.breadStarter}">${L('Levande surdegsgrund', 'Live sourdough starter')}</button></div></div>
