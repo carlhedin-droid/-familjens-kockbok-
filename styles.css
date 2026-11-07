@@ -637,3 +637,54 @@ details.adv[open] summary { margin-bottom: 8px; }
 .set-row .ss-title { flex: 1 1 auto; }
 .home .asker-row .btn { margin-left: auto; }
 .ss-body .seg { justify-self: start; }
+
+/* ============ Receptets extra delar (nov 2026) ============ */
+.ahead { display: grid; gap: 2px; margin: 14px 0 0; padding: 10px 14px; border-left: 4px solid var(--kunyit); background: var(--surface); border-radius: 0 var(--r-sm) var(--r-sm) 0; max-width: 64ch; }
+.ahead strong { font-size: 14.5px; }
+.ahead span { color: var(--ink); }
+.overview { margin: 14px 0 0; max-width: 64ch; }
+.overview ol { margin: 0; padding: 0; list-style: none; counter-reset: ov; display: grid; gap: 4px; }
+.overview li { counter-increment: ov; display: flex; gap: 10px; align-items: baseline; }
+.overview li::before { content: counter(ov); font-family: var(--font-display); font-weight: 800; color: var(--pandan); min-width: 1ch; }
+.ov-time { margin: 12px 0 6px; font-size: 14.5px; color: var(--muted); }
+.overview .ov-time { margin-top: 0; }
+.ing { position: relative; }
+.swap-btn { margin-left: auto; align-self: center; border: 1px solid var(--line); background: var(--surface); color: var(--pandan); border-radius: 999px; padding: 3px 11px; font-size: 13.5px; font-weight: 700; flex: none; }
+.swap-btn[aria-expanded="true"] { background: var(--pandan-soft); border-color: var(--pandan); }
+.swaps { display: grid; gap: 6px; padding: 8px 0 12px 34px; border-bottom: 1px solid var(--line); }
+.swap { display: grid; gap: 1px; text-align: left; border: 1px solid var(--line); background: var(--bg); border-radius: var(--r-sm); padding: 8px 12px; }
+.swap:hover { border-color: var(--pandan); }
+.swap span { font-size: 14px; color: var(--muted); }
+.opt-toggle { margin: 0 0 8px; font-size: 14px; padding: 6px 12px; }
+.step[hidden] { display: none; }
+.tag.optional { background: transparent; border: 1.5px dashed var(--muted); color: var(--muted); margin: 0 8px 0 0; vertical-align: 2px; font-size: 13px; }
+a.howto { text-decoration: none; color: var(--ink); }
+.r-extra { margin-top: 22px; }
+.r-extra h3 { font-size: 18px; margin-bottom: 8px; }
+.r-extra dl { margin: 0; display: grid; gap: 2px 14px; }
+.trouble dt { font-weight: 700; margin-top: 8px; }
+.trouble dt:first-child { margin-top: 0; }
+.trouble dd, .store dd { margin: 0; color: var(--muted); }
+.store { grid-template-columns: max-content 1fr; }
+.store dt { font-weight: 700; }
+.serve { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 8px; }
+.serve-btn { display: grid; gap: 2px; text-align: left; border: 1px solid var(--line); background: var(--bg); border-radius: var(--r-md); padding: 10px 12px; }
+.serve-btn strong { font-family: var(--font-display); }
+.serve-btn span { font-size: 14px; color: var(--muted); }
+.serve-btn:hover { border-color: var(--pandan); }
+.enrich { margin-top: 22px; }
+.ing:has(.swap-btn) { grid-template-columns: 28px minmax(84px, max-content) 1fr auto; }
+.step[data-n]::before { content: attr(data-n); }
+
+/* ============ Dryck (nov 2026) ============ */
+.drinks .dr-style { margin: 0 0 10px; max-width: 64ch; }
+.bottles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px; }
+.bottle { display: grid; gap: 2px; align-content: start; border: 1px solid var(--line); background: var(--bg); border-radius: var(--r-md); padding: 10px 12px; }
+.bottle strong { font-family: var(--font-display); }
+.b-meta, .b-why { font-size: 14px; color: var(--muted); }
+.b-links { margin-top: 6px; font-size: 14.5px; display: flex; gap: 12px; flex-wrap: wrap; }
+.b-links a { color: var(--pandan); font-weight: 700; text-underline-offset: 3px; }
+.b-links a.b-alt { font-weight: 400; color: var(--muted); }
+.dr-na { margin: 10px 0 0; }
+.drinks .hint { font-size: 13.5px; color: var(--muted); margin: 8px 0 0; }
+.enrich + .enrich { margin-top: 10px; }

@@ -17,6 +17,7 @@ const EN_VALUES = {
   'Hela eftermiddagen': 'All afternoon',
   'Färsk jäst': 'Fresh yeast', 'Torrjäst': 'Dry yeast', 'Surdeg': 'Sourdough', 'Förjäsning (poolish/biga)': 'Pre-ferment (poolish/biga)',
   'Vetemjöl': 'Wheat flour', 'Rågmjöl': 'Rye flour', 'Dinkel': 'Spelt', 'Fullkorn': 'Whole grain', 'Durum': 'Durum', 'Ölandsvete': 'Öland wheat',
+  'Under 120 kr': 'Under SEK 120', '120–200 kr': 'SEK 120–200', '200–350 kr': 'SEK 200–350', 'Över 350 kr': 'Over SEK 350',
   'Bakstål': 'Baking steel', 'Ånga i ugnen': 'Steam in the oven', 'Plåt': 'Baking tray', 'Form': 'Loaf tin',
   'Efter receptet': 'Follow the recipe', 'Samma dag': 'Same day', 'Över natten i kyl': 'Overnight in the fridge', '1–3 dygn i kyl': '1–3 days in the fridge',
   'För hand': 'By hand', 'Degblandare': 'Dough mixer', 'Utan knådning, vik degen': 'No-knead, fold the dough',
@@ -56,7 +57,7 @@ function setLang(lang) {
   applyStaticLang(); renderStatus(); renderStage(); renderChat(); renderAttach(); tickTimers();
   const el = $('#sync'); if (el) el.textContent = tv(S.sync.state || '');
 }
-const ENGLISH_RULE = `- LANGUAGE: The app is set to English. Write everything the user sees in natural English: "reply", all recipe and suggestion text (title, origin, intro, ingredient names and groups, steps, health, tips, why, keyIngredients, equipment) and "learn". This overrides the Swedish examples above, and the instructions being in Swedish does not change it. Use g, kg, ml, l, tbsp and tsp, and "Easy", "Medium" or "Advanced" for "difficulty". Keep "tag" exactly VARDAG or HELG (VARDAG means weekday, HELG means weekend). Family notes may be in Swedish; understand them and answer in English. If a recipe on screen or at a link is in Swedish or another language, translate it when you send it. If information is missing: ask in "reply" and set suggestions/recipe to null.`;
+const ENGLISH_RULE = `- LANGUAGE: The app is set to English. Keep "howTo" search terms in English. Write everything the user sees in natural English: "reply", all recipe and suggestion text (title, origin, intro, overview, activeTime, ahead, ingredient names, groups and swaps, steps, health, tips, troubleshoot, serveWith, storage, drinks (style, why, kind, nonAlcoholic; keep bottle names as on the label), why, keyIngredients, equipment) and "learn". This overrides the Swedish examples above, and the instructions being in Swedish does not change it. Use g, kg, ml, l, tbsp and tsp, and "Easy", "Medium" or "Advanced" for "difficulty". Keep "tag" exactly VARDAG or HELG (VARDAG means weekday, HELG means weekend). Family notes may be in Swedish; understand them and answer in English. If a recipe on screen or at a link is in Swedish or another language, translate it when you send it. If information is missing: ask in "reply" and set suggestions/recipe to null.`;
 const langRule = () => FORMAT_RULES.replace('- Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.', L('- Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.', ENGLISH_RULE));
 
 /* ============ Standardtexter ============ */
@@ -167,7 +168,7 @@ LÄGE 2 – RECEPT (vald rätt, länk eller inklistrat recept, eller ändring)
 - Varje steg: mängder utskrivna, värme (svag/medel/hög eller °C), tid och klar-tecken (färg, konsistens, innertemperatur för kött, fågel och fisk).
 - Flavor ROI: fett och kalorier som ger stor smakutdelning är ok. Smak går före asketism – maten får aldrig bli tråkig.
 - Hälsa: följ hälsomålet. Uppskatta protein (g) och energi (kcal) per portion och ge konkreta byten för den som vill äta lättare.
-- RENSKRIVNING (länk eller inklistrat recept): återge originalet troget – samma råvaror, mängder, tekniker och ordning. Ändra bara det som gör receptet lättare att följa: metriska mått, skalning till våra portioner, mängder utskrivna i stegen, tydligare och kortare steg, värme och klar-tecken där originalet är otydligt. Egna förbättringar och anpassningar efter våra inställningar läggs i "tips" eller "health" – inte i själva receptet. Undantag: krockar något med ALLERGIER OCH ÄTER INTE, byt ut det och säg det i reply. Sätt "source" till länken. Säg i reply kort varifrån receptet kommer och vad du justerat.
+- RENSKRIVNING (länk eller inklistrat recept): återge originalet troget – samma råvaror, mängder, tekniker och ordning. Ändra bara det som gör receptet lättare att följa: metriska mått, skalning till våra portioner, mängder utskrivna i stegen, tydligare och kortare steg, värme och klar-tecken där originalet är otydligt. Egna förbättringar och anpassningar efter våra inställningar läggs i "tips", "health" och de extra delarna (byten, om det går fel, servera med, förvaring) – inte i själva receptet. Undantag: krockar något med ALLERGIER OCH ÄTER INTE, byt ut det och säg det i reply. Sätt "source" till länken. Säg i reply kort varifrån receptet kommer och vad du justerat.
 - Kunde du inte läsa länken (sidan saknas, kräver inloggning eller innehåller inget recept): hitta INTE på ett recept. Säg det i reply, sätt recipe till null och be oss klistra in receptets text.
 - Ändring: skicka hela receptet, behåll ingrediens-id och portioner om inget annat sägs.
 
@@ -237,6 +238,8 @@ const BREAD_OPT = {
   knead: [['', 'Efter receptet'], ['hand', 'För hand'], ['maskin', 'Degblandare'], ['vik', 'Utan knådning, vik degen']],
   hydration: [['', 'Efter receptet'], ['fast', 'Fast, ca 60–65 %'], ['mellan', 'Mellan, ca 65–75 %'], ['hog', 'Hög, över 75 %']],
 };
+const DRINK_PRICES = [['budget', 'Under 120 kr'], ['mellan', '120–200 kr'], ['bra', '200–350 kr'], ['fest', 'Över 350 kr']];
+const DRINK_DEFAULTS = { drinkPrice: 'mellan', drinkNA: true, drinkWeekday: false };
 const BREAD_DEFAULTS = { breadLeaven: [], breadStarter: false, breadProof: '', breadKnead: '', breadHydration: '', breadFlour: [], breadBake: [], breadNote: '' };
 const CARL_PREFS = {
   portions: 4, bigEaters: true, foodieAdded: true,
@@ -248,6 +251,7 @@ const CARL_PREFS = {
   migratedV4: true,
   customEquipment: [],
   ...BREAD_DEFAULTS,
+  ...DRINK_DEFAULTS,
 };
 // Neutrala förval för nya familjer (fylls i via introduktionen)
 const DEFAULT_PROFILE = '';
@@ -261,6 +265,7 @@ const DEFAULT_PREFS = {
   migratedV4: true,
   customEquipment: [],
   ...BREAD_DEFAULTS,
+  ...DRINK_DEFAULTS,
 };
 const HAD_DATA = (() => { try { return !!localStorage.getItem('fk.data') || !!(JSON.parse(localStorage.getItem('fk.settings') || '{}').geminiKey); } catch { return false; } })();
 
@@ -275,10 +280,17 @@ const RESPONSE_SCHEMA = {
       required: ['name', 'origin', 'tag', 'time', 'why'] } },
     recipe: { type: 'OBJECT', nullable: true, properties: {
       title: S_STR, origin: S_STR, countries: S_ARR, source: S_STRN, tag: { type: 'STRING', enum: ['VARDAG', 'HELG'] }, time: S_STR, servings: { type: 'INTEGER' }, intro: S_STR,
-      ingredients: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: S_STR, amount: S_STR, name: S_STR, note: S_STRN, group: S_STRN }, required: ['id', 'amount', 'name'] } },
-      steps: { type: 'ARRAY', items: { type: 'OBJECT', properties: { text: S_STR, uses: S_ARR, minutes: { type: 'INTEGER', nullable: true } }, required: ['text'] } },
+      overview: S_ARR, activeTime: S_STRN, ahead: S_STRN,
+      ingredients: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: S_STR, amount: S_STR, name: S_STR, note: S_STRN, group: S_STRN,
+        swaps: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: S_STR, amount: S_STRN, why: S_STR }, required: ['name', 'why'] } } }, required: ['id', 'amount', 'name'] } },
+      steps: { type: 'ARRAY', items: { type: 'OBJECT', properties: { text: S_STR, uses: S_ARR, minutes: { type: 'INTEGER', nullable: true }, optional: { type: 'BOOLEAN' }, howTo: S_STRN }, required: ['text'] } },
       health: { type: 'OBJECT', nullable: true, properties: { summary: S_STR, tips: S_ARR } },
-      tips: S_ARR },
+      tips: S_ARR,
+      troubleshoot: { type: 'ARRAY', items: { type: 'OBJECT', properties: { problem: S_STR, fix: S_STR }, required: ['problem', 'fix'] } },
+      serveWith: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: S_STR, why: S_STRN }, required: ['name'] } },
+      storage: { type: 'OBJECT', nullable: true, properties: { fridge: S_STRN, freezer: S_STRN, leftovers: S_STRN } },
+      drinks: { type: 'OBJECT', nullable: true, properties: { style: S_STR, nonAlcoholic: S_STRN,
+        bottles: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: S_STR, kind: S_STRN, country: S_STRN, price: S_STRN, why: S_STRN, nr: S_STRN }, required: ['name'] } } }, required: ['style'] } },
       required: ['title', 'ingredients', 'steps'] },
     learn: S_ARR,
     offerUpdate: { type: 'BOOLEAN' },
@@ -294,16 +306,34 @@ Du svarar inuti en app. Svara ALLTID med exakt ett JSON-objekt – ingen text f�
   "suggestions": null | [ { "name": "", "origin": "kök/land", "countries": ["MY"], "tag": "VARDAG" | "HELG", "time": "t.ex. 35 min", "difficulty": "Lätt" | "Medel" | "Avancerad", "why": "1–2 meningar om varför den passar oss", "keyIngredients": [""], "equipment": "" | null, "healthier": true|false, "vegetarian": true|false } ],
   "recipe": null | {
     "title": "", "origin": "", "countries": ["MY"], "source": "länk till originalet" | null, "tag": "VARDAG" | "HELG", "time": "", "servings": 4, "intro": "1–2 meningar",
-    "ingredients": [ { "id": "i1", "amount": "300 g", "name": "kycklinglårfilé", "note": "i bitar" | null, "group": "Marinad" | null } ],
-    "steps": [ { "text": "Bryn 300 g kycklinglårfilé ...", "uses": ["i1"], "minutes": 8 | null } ],
+    "overview": ["Marinera kycklingen", "Stek den i samma panna", "Koka ihop såsen"],
+    "activeTime": "40 min" | null, "ahead": "Marinera minst 3 h, gärna över natten" | null,
+    "ingredients": [ { "id": "i1", "amount": "300 g", "name": "kycklinglårfilé", "note": "i bitar" | null, "group": "Marinad" | null,
+      "swaps": [ { "name": "kycklingbröst", "amount": "300 g" | null, "why": "magrare, kortare stektid" } ] } ],
+    "steps": [ { "text": "Bryn 300 g kycklinglårfilé ...", "uses": ["i1"], "minutes": 8 | null, "optional": false, "howTo": "how to sear chicken thighs" | null } ],
     "health": { "summary": "≈45 g protein och 650 kcal per portion. …", "tips": ["konkret byte för den som vill äta lättare"] },
-    "tips": [""]
+    "tips": [""],
+    "troubleshoot": [ { "problem": "Såsen är för tunn", "fix": "Sjud utan lock 5–10 min." } ],
+    "serveWith": [ { "name": "Gurkraita", "why": "svalkar hettan" } ],
+    "storage": { "fridge": "3 dagar", "freezer": "3 månader, utan grädden" | null, "leftovers": "Fyll wraps med resterna" | null },
+    "drinks": { "style": "Fruktigt rött med låga tanniner, t.ex. Pinot noir. Mjukar upp kryddorna.", "nonAlcoholic": "Mangolassi" | null,
+      "bottles": [ { "name": "Villa Wolf Pinot Noir", "kind": "Rött vin", "country": "Tyskland", "price": "ca 119 kr", "why": "Lätt och bärig", "nr": "7678801" | null } ] } | null
   },
   "learn": [ "kort ny lärdom om familjens smak/vanor" ],
   "offerUpdate": false
 }
 Regler:
 - LÄGE 3 (inspiration) → fyll "suggestions". LÄGE 2 (komplett recept, eller när jag ber dig ändra receptet som visas) → fyll "recipe" med HELA receptet. LÄGE 1 → båda null.
+- Receptets extra delar (kort, konkret, inget fyllnadsprat):
+  - "overview": 2–3 korta rader om hur rätten görs, i ordning.
+  - "activeTime": tid vid spisen. "time" är total tid inklusive väntan. "ahead": det som måste göras i förväg (marinering, blötläggning, deg som jäser, vila) med minsta och bästa tid, annars null.
+  - "swaps": bara för 2–5 ingredienser där ett byte är vanligt (svår att hitta, dyr, allergi, smak). 1–3 alternativ var med mängd och varför. Krockar aldrig med ALLERGIER OCH ÄTER INTE. Annars [].
+  - "optional": true för steg som går att hoppa över utan att rätten faller (garnering, mixning, rostning av extra topping).
+  - "howTo": för 1–3 tekniska moment som är lättare att se än att läsa (vika dumplings, filea fisk, temperera choklad, knåda deg): en kort YouTube-sökterm PÅ ENGELSKA. Annars null.
+  - "troubleshoot": 2–3 vanliga problem för just den här rätten med konkret åtgärd.
+  - "serveWith": 2–3 tillbehör som passar, med kort varför.
+  - "drinks": se Dryckestips i INSTÄLLNINGAR. "style": vilken typ av vin eller dryck som passar och varför (1–2 meningar). "bottles": 2–3 specifika flaskor ur Systembolagets ordinarie sortiment inom prisklassen, väletablerade och med gott rykte. Ange Systembolagets artikelnummer i "nr" BARA om du är säker, annars null – hitta aldrig på nummer. "nonAlcoholic": ett alkoholfritt alternativ (gärna en flaska från Systembolaget eller något hemgjort). Annars null.
+  - "storage": hållbarhet i kyl, om den går att frysa (och hur), och en idé för resterna. null om det inte är relevant (t.ex. en dryck).
 - I varje steg: skriv ut mängderna i texten och lista ingrediensernas id i "uses". "minutes" anges för steg med vänte-/tillagningstid.
 - "countries": ISO 3166-1 alfa-2-koder (versaler) för rättens ursprungsland, t.ex. ["MY"], ["FR","SE"] för fusion. Regionalt kök → huvudlandet (Sydamerikanskt ceviche → ["PE"]).
 - "group" används för att dela upp ingredienser (t.ex. "Marinad", "Sås", "Servering"); annars null.
@@ -678,7 +708,8 @@ function prefsText(d) {
 - Lättare alternativ: ${P.healthyAlt ? `ja – fyll alltid "health" med hur rätten anpassas för ${P.healthWho || 'den'} som vill äta lättare` : 'bara om vi ber om det'}
 - Favoritländer (sprid förslagen över dessa kök): ${P.cuisines.join(', ') || 'alla'}
 - Standardutrustning (finns alltid): ${STANDARD_KITCHEN}
-- Specialutrustning vi har: ${equip.join(', ') || 'ingen utöver standard'}${breadText(P)}`;
+- Specialutrustning vi har: ${equip.join(', ') || 'ingen utöver standard'}${breadText(P)}
+- Dryckestips: ${d.weekend || P.drinkWeekday ? `JA – fyll "drinks" i varje recept. Prisklass per flaska: ${(DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1]}${P.drinkNA ? '. Ge alltid ett alkoholfritt alternativ' : ''}` : 'nej – sätt "drinks" till null om vi inte ber om det'}`;
 }
 function stripRecipe(r) {
   const { id, savedAt, updatedAt, notes, rating, cooked, ...rest } = r;
@@ -874,9 +905,21 @@ function recipeDiff(a, b) {
 const CLAIM_RE = /(i(?:'ve| have) (?:updated|changed|adjusted|replaced|added|removed)|has been (?:updated|changed|adjusted)|here is the (?:new|updated|revised)|uppdaterat|uppdaterade|uppdaterats|uppdaterar|ändrat|ändrade|ändrats|justerat|justerade|justerats|har bytt|bytt ut|bytts ut|lagt till|lagts till|tagit bort|tagits bort|här är (det|ditt|ert) (nya|ändrade|reviderade))/i;
 function normalizeRecipe(r) {
   if (!r || !Array.isArray(r.ingredients) || !Array.isArray(r.steps)) return null;
-  r.ingredients = r.ingredients.map((x, i) => ({ id: String(x.id || `i${i + 1}`), amount: x.amount || '', name: x.name || '', note: x.note || '', group: x.group || '' }));
+  const arr = x => Array.isArray(x) ? x : [];
+  const str = x => typeof x === 'string' && x.trim() && !/^(null|none|n\/a)$/i.test(x.trim()) ? x.trim() : null;
+  r.ingredients = r.ingredients.map((x, i) => ({ id: String(x.id || `i${i + 1}`), amount: x.amount || '', name: x.name || '', note: x.note || '', group: x.group || '',
+    swaps: arr(x.swaps).filter(w => w && str(w.name)).slice(0, 3).map(w => ({ name: str(w.name), amount: str(w.amount), why: str(w.why) || '' })) }));
   r.steps = r.steps.map(s => typeof s === 'string' ? { text: s, uses: [], minutes: null } :
-    { text: s.text || '', uses: Array.isArray(s.uses) ? s.uses.map(String) : [], minutes: Number(s.minutes) > 0 ? Number(s.minutes) : null });
+    { text: s.text || '', uses: Array.isArray(s.uses) ? s.uses.map(String) : [], minutes: Number(s.minutes) > 0 ? Number(s.minutes) : null, optional: s.optional === true, howTo: str(s.howTo) });
+  r.overview = arr(r.overview).map(str).filter(Boolean).slice(0, 4);
+  r.activeTime = str(r.activeTime); r.ahead = str(r.ahead);
+  r.troubleshoot = arr(r.troubleshoot).filter(t => t && str(t.problem) && str(t.fix)).slice(0, 4).map(t => ({ problem: str(t.problem), fix: str(t.fix) }));
+  r.serveWith = arr(r.serveWith).filter(t => t && str(t.name)).slice(0, 4).map(t => ({ name: str(t.name), why: str(t.why) }));
+  const st = r.storage && typeof r.storage === 'object' ? { fridge: str(r.storage.fridge), freezer: str(r.storage.freezer), leftovers: str(r.storage.leftovers) } : null;
+  r.storage = st && (st.fridge || st.freezer || st.leftovers) ? st : null;
+  const dr = r.drinks && typeof r.drinks === 'object' ? r.drinks : null;
+  r.drinks = dr && str(dr.style) ? { style: str(dr.style), nonAlcoholic: str(dr.nonAlcoholic),
+    bottles: arr(dr.bottles).filter(x => x && str(x.name)).slice(0, 4).map(x => ({ name: str(x.name), kind: str(x.kind), country: str(x.country), price: str(x.price), why: str(x.why), nr: /^\d{3,8}$/.test(String(x.nr || '').replace(/\s/g, '')) ? String(x.nr).replace(/\s/g, '') : null })) } : null;
   r.servings = r.servings || 4;
   if (r.source && !/^https?:\/\//.test(r.source)) r.source = null;
   r.health = r.health || null; r.tips = Array.isArray(r.tips) ? r.tips : [];
@@ -923,15 +966,16 @@ async function send(text, image, opts = {}) {
     }
     if (recipe && linkInMsg && !recipe.source) recipe.source = linkInMsg;
     if (recipe) {
-      const keepId = S.route.view === 'recipe' ? S.current.recipeSavedId : null;
-      const sameDish = S.route.view === 'recipe' && S.current.recipe;
+      const keepId = S.route.view === 'recipe' && !opts.newDish ? S.current.recipeSavedId : null;
+      const sameDish = S.route.view === 'recipe' && !opts.newDish && S.current.recipe;
       const prevRecipe = sameDish ? S.current.recipe : null;
       S.current.recipe = recipe; S.current.recipeSavedId = keepId; S.current.dirty = !!keepId;
+      S.openSwap = null;
       if (!sameDish) { S.checked = {}; S.doneSteps = {}; S.activeStep = null; S.cookStart = null; newSession(); }
       addHistory(recipe, keepId);
       if (!(S.portions && S.portions.title === recipe.title)) S.portions = null;
       msg.view = { recipe };
-      if (flow) msg.hidden = true; else { const d = recipeDiff(prevRecipe, recipe); msg.updated = prevRecipe ? (d.length ? d : 'same') : [L('nytt recept', 'new recipe')]; }
+      if (flow) msg.hidden = true; else { const d = recipeDiff(prevRecipe, recipe); msg.updated = prevRecipe ? (d.length ? d : opts.enrich === 'drinks' ? [L('dryckestips är tillagda', 'drink suggestions are added')] : opts.enrich ? [L('översikt, byten och tips är tillagda', 'overview, swaps and tips are added')] : 'same') : [L('nytt recept', 'new recipe')]; }
       if (S.route.view !== 'recipe') go('recipe', { keepChat: true }); else { const sc = $('#stage').scrollTop; renderStage(); $('#stage').scrollTop = sc; }
       saveSession();
     } else if (sugg) {
@@ -1197,6 +1241,7 @@ function viewRecipe() {
       </span>
     </div>
     ${r.intro ? `<p class="r-intro">${esc(r.intro)}</p>` : ''}
+    ${recipeTop(r)}
   </header>
 
   <nav class="r-jump" aria-label="${L('Hoppa till', 'Jump to')}">
@@ -1212,16 +1257,19 @@ function viewRecipe() {
         <input type="checkbox" ${S.checked[i.id] ? 'checked' : ''} data-check="${esc(i.id)}">
         <span class="amt">${esc(scaleAmount(i.amount, f))}</span>
         <span><span class="name">${esc(i.name)}</span>${i.note ? ` <span class="note">${esc(i.note)}</span>` : ''}</span>
-      </label>`).join('')}</div>`).join('')}
+        ${i.swaps?.length ? `<button type="button" class="swap-btn" data-swapopen="${esc(i.id)}" aria-expanded="${S.openSwap === i.id}">${L('Byt', 'Swap')}</button>` : ''}
+      </label>${i.swaps?.length && S.openSwap === i.id ? swapPanel(i, f) : ''}`).join('')}</div>`).join('')}
     <button class="btn start-cook" data-startcook>${L('Allt är framme – börja laga', 'Everything is out – start cooking')}</button>
   </section>
 
   <section class="r-sec steps" id="r-steps" aria-label="${L('Gör så här', 'Method')}">
     <div class="sec-head"><h2>${L('Gör så här', 'Method')}</h2><span class="muted step-hint">${L('Tryck på ett steg för att markera var du är', 'Tap a step to mark where you are')}</span>${stepper}</div>
+    ${r.steps.some(s => s.optional) ? `<button type="button" class="chip opt opt-toggle" data-hideopt aria-pressed="${!!S.hideOptional}">${L('Dölj steg som kan hoppas över', 'Hide optional steps')}</button>` : ''}
     <ol>${r.steps.map((s, k) => `
-      <li class="step ${S.activeStep === k ? 'active' : ''} ${S.doneSteps[k] ? 'done' : ''}" data-step="${k}">
-        <div class="step-text">${highlightAmounts(scaleStepText(s.text, f))}</div>
+      <li class="step ${S.activeStep === k ? 'active' : ''} ${S.doneSteps[k] ? 'done' : ''}" data-step="${k}" data-n="${k + 1}" ${s.optional && S.hideOptional ? 'hidden' : ''}>
+        <div class="step-text">${s.optional ? `<span class="tag optional">${L('Kan hoppas över', 'Optional')}</span>` : ''}${highlightAmounts(scaleStepText(s.text, f))}</div>
         <div class="step-tools">
+          ${s.howTo ? `<a class="ghost howto" href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.howTo)}" target="_blank" rel="noopener">▶ ${L('Visa hur', 'Show me')}</a>` : ''}
           ${s.minutes ? `<button class="ghost" data-timer="${k}">⏱ ${fmtMin(s.minutes)}</button>` : ''}
           <button class="ghost" data-done="${k}">${S.doneSteps[k] ? L('Ångra', 'Undo') : L('Klar', 'Done')}</button>
         </div>
@@ -1231,10 +1279,49 @@ function viewRecipe() {
         ${r.health.tips?.length ? `<ul>${r.health.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>` : ''}
       ${r.tips?.length ? `<div class="tips"><h3>${L(`Souschefens tips`, `Sous-chef's tips`)}</h3><ul>${r.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
     </div>` : ''}
+    ${recipeAfter(r)}
     ${saved ? `<div class="notes-wrap">${notesBox(saved)}</div>` : ''}
   </section>
   </div>
   </article>`;
+}
+// Översikt och tid överst i receptet
+function recipeTop(r) {
+  const times = [r.activeTime && L(`Aktiv tid ${r.activeTime}`, `Active ${r.activeTime}`), r.activeTime && r.time && L(`totalt ${r.time}`, `total ${r.time}`)].filter(Boolean).join(', ');
+  return `${r.ahead ? `<div class="ahead"><strong>${L('Börja i förväg', 'Start ahead')}</strong><span>${esc(r.ahead)}</span></div>` : ''}
+    ${r.overview?.length ? `<div class="overview">${times ? `<p class="ov-time">${esc(times)}</p>` : ''}<ol>${r.overview.map(o => `<li>${esc(o)}</li>`).join('')}</ol></div>` : times ? `<p class="ov-time">${esc(times)}</p>` : ''}`;
+}
+function swapPanel(i, f) {
+  return `<div class="swaps" role="group" aria-label="${L(`Byt ut ${esc(i.name)}`, `Swap ${esc(i.name)}`)}">${i.swaps.map((w, k) => `
+    <button type="button" class="swap" data-swap="${esc(i.id)}" data-k="${k}"><strong>${w.amount ? esc(scaleAmount(w.amount, f)) + ' ' : ''}${esc(w.name)}</strong>${w.why ? `<span>${esc(w.why)}</span>` : ''}</button>`).join('')}</div>`;
+}
+// Efter stegen: om det går fel, servera med, förvaring – eller en knapp som kompletterar äldre recept
+function recipeAfter(r) {
+  const has = r.troubleshoot?.length || r.serveWith?.length || r.storage || r.overview?.length;
+  if (!has) return drinksBlock(r) + `<div class="enrich"><button class="ghost" data-enrich>${L('Lägg till översikt, byten och tips', 'Add overview, swaps and tips')}</button></div>`;
+  const st = r.storage;
+  return `${r.troubleshoot?.length ? `<div class="r-extra"><h3>${L('Om det går fel', 'If it goes wrong')}</h3><dl class="trouble">${r.troubleshoot.map(t => `<dt>${esc(t.problem)}</dt><dd>${esc(t.fix)}</dd>`).join('')}</dl></div>` : ''}
+    ${r.serveWith?.length ? `<div class="r-extra"><h3>${L('Servera med', 'Serve with')}</h3><div class="serve">${r.serveWith.map((x, k) => `<button type="button" class="serve-btn" data-serve="${k}"><strong>${esc(x.name)}</strong>${x.why ? `<span>${esc(x.why)}</span>` : ''}</button>`).join('')}</div></div>` : ''}
+    ${drinksBlock(r)}
+    ${st ? `<div class="r-extra"><h3>${L('Förvaring och rester', 'Storage and leftovers')}</h3><dl class="store">
+      ${st.fridge ? `<dt>${L('Kyl', 'Fridge')}</dt><dd>${esc(st.fridge)}</dd>` : ''}${st.freezer ? `<dt>${L('Frys', 'Freezer')}</dt><dd>${esc(st.freezer)}</dd>` : ''}${st.leftovers ? `<dt>${L('Rester', 'Leftovers')}</dt><dd>${esc(st.leftovers)}</dd>` : ''}</dl></div>` : ''}`;
+}
+// Dryck till maten (helg, eller på begäran). Länk: artikelnummer om souschefen angav ett, annars sökning.
+const sbSearch = q => `https://www.systembolaget.se/sok/?textQuery=${encodeURIComponent(q)}`;
+function drinksBlock(r) {
+  const dr = r.drinks;
+  if (!dr) return `<div class="enrich"><button class="ghost" data-drinks>🍷 ${L('Föreslå dryck till maten', 'Suggest a drink')}</button></div>`;
+  return `<div class="r-extra drinks"><h3>${L('Dryck till maten', 'Drinks')}</h3>
+    <p class="dr-style">${esc(dr.style)}</p>
+    ${dr.bottles.length ? `<div class="bottles">${dr.bottles.map(b => `<div class="bottle">
+      <strong>${esc(b.name)}</strong>
+      ${[b.kind, b.country, b.price].filter(Boolean).length ? `<span class="b-meta">${esc([b.kind, b.country, b.price].filter(Boolean).join(', '))}</span>` : ''}
+      ${b.why ? `<span class="b-why">${esc(b.why)}</span>` : ''}
+      <span class="b-links"><a href="${b.nr ? `https://www.systembolaget.se/${b.nr}` : sbSearch(b.name)}" target="_blank" rel="noopener">${b.nr ? L('Öppna på Systembolaget', 'Open at Systembolaget') : L('Sök på Systembolaget', 'Search Systembolaget')}</a>${b.nr ? ` <a class="b-alt" href="${sbSearch(b.name)}" target="_blank" rel="noopener">${L('Sök i stället', 'Search instead')}</a>` : ''}</span>
+    </div>`).join('')}</div>` : ''}
+    ${dr.nonAlcoholic ? `<p class="dr-na"><strong>${L('Alkoholfritt', 'Alcohol-free')}:</strong> ${esc(dr.nonAlcoholic)}</p>` : ''}
+    <p class="hint">${L('Sortiment och priser ändras. Kontrollera flaskan på Systembolaget.', 'Range and prices change. Check the bottle at Systembolaget.')}</p>
+  </div>`;
 }
 const fmtMin = m => m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
 function notesBox(saved) {
@@ -1340,6 +1427,7 @@ function secSummary(key) {
     case 'health': return P.healthNote.trim() ? (P.healthWho.trim() ? `${P.healthWho.trim()}: ` : '') + P.healthNote.trim() : L('Inget mål', 'No goal');
     case 'cuisines': return list(P.cuisines, L('Alla kök', 'All cuisines'));
     case 'equipment': return list([...P.equipment, ...P.customEquipment], L('Vanligt kök', 'Regular kitchen'));
+    case 'drinks': return tv((DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1]) + (P.drinkNA ? L(', alkoholfritt alternativ', ', alcohol-free option') : '') + (P.drinkWeekday ? L(', även vardag', ', weekdays too') : '');
     case 'bread': { const b = [...P.breadLeaven.map(tv), lab(BREAD_OPT.proof, P.breadProof), lab(BREAD_OPT.knead, P.breadKnead), lab(BREAD_OPT.hydration, P.breadHydration), ...P.breadFlour.map(tv), ...P.breadBake.map(tv)].filter(Boolean);
       return b.length ? b.join(', ') : L('Efter receptet', 'Follow the recipe'); }
     case 'memory': { const n = S.data.memory.filter(m => !m.deleted).length;
@@ -1391,6 +1479,11 @@ function prefsSections() {
       ${groups(OPT.equipment, v => chip('equipment', v))}
       ${P.customEquipment.length ? `<div class="chips">${P.customEquipment.map(v => `<button type="button" class="chip opt" data-premove="${esc(v)}" aria-pressed="true" title="${L('Tryck för att ta bort', 'Tap to remove')}">${esc(v)} ×</button>`).join('')}</div>` : ''}
       <div class="add-row"><input id="equipNew" placeholder="${L('Lägg till egen, t.ex. Plancha', 'Add your own, e.g. Plancha')}" aria-label="${L('Egen utrustning', 'Your own equipment')}"><button class="ghost" data-equipadd>${L('Lägg till', 'Add')}</button></div>`),
+    sec('drinks', L('Dryck', 'Drinks'), `
+      <p class="hint ss-lead">${L('Souschefen föreslår dryck och flaskor från Systembolaget till helgens recept.', 'The sous-chef suggests drinks and bottles from Systembolaget for weekend recipes.')}</p>
+      <div class="sel-grid">${sel('drinkPrice', L('Pris per flaska', 'Price per bottle'), DRINK_PRICES)}</div>
+      <div class="chips"><button type="button" class="chip opt" data-pbool="drinkNA" aria-pressed="${P.drinkNA}">${L('Alltid ett alkoholfritt alternativ', 'Always an alcohol-free option')}</button>
+        <button type="button" class="chip opt" data-pbool="drinkWeekday" aria-pressed="${P.drinkWeekday}">${L('Även på vardagar', 'On weekdays too')}</button></div>`),
     sec('bread', L('Bakning av bröd', 'Bread baking'), `
       <p class="hint ss-lead">${L('Det ni lämnar tomt väljer souschefen efter receptet.', 'Whatever you leave empty, the sous-chef picks to suit the recipe.')}</p>
       <div class="opt-group"><h3>${L('Jäsmedel', 'Leavening')}</h3><div class="chips">${BREAD_OPT.leaven.map(v => chip('breadLeaven', v)).join('')}<button type="button" class="chip opt" data-pbool="breadStarter" aria-pressed="${P.breadStarter}">${L('Levande surdegsgrund', 'Live sourdough starter')}</button></div></div>
@@ -1583,6 +1676,22 @@ $('#stage').addEventListener('click', async e => {
   if (pick) { const s = S.current.suggestions[+pick.dataset.pick]; send(L(`Ge mig det kompletta receptet på ${s.name}.`, `Give me the complete recipe for ${s.name}.`), null, { flow: true }); return; }
   if (t.closest('[data-more]')) { send(L('Ge mig fler förslag, gärna åt ett annat håll.', 'Give me more suggestions, ideally in a different direction.'), null, { flow: true }); return; }
 
+  // Recept: byten, valfria steg, tillbehör, komplettering
+  const so = t.closest('[data-swapopen]');
+  if (so) { e.preventDefault(); S.openSwap = S.openSwap === so.dataset.swapopen ? null : so.dataset.swapopen; keepScroll(renderStage); return; }
+  const sw = t.closest('[data-swap]');
+  if (sw) {
+    const r = S.current.recipe, ing = r.ingredients.find(x => x.id === sw.dataset.swap), w = ing?.swaps?.[+sw.dataset.k]; if (!w) return;
+    S.openSwap = null; keepScroll(renderStage); openChat(true);
+    const to = `${w.amount ? w.amount + ' ' : ''}${w.name}`;
+    send(L(`Byt ${ing.name} mot ${to} i receptet. Justera stegen efter det och skicka HELA receptet i "recipe".`, `Swap ${ing.name} for ${to} in the recipe. Adjust the steps to match and send the WHOLE recipe in "recipe".`), null, { display: L(`Byt ${ing.name} mot ${w.name}`, `Swap ${ing.name} for ${w.name}`) });
+    return;
+  }
+  if (t.closest('[data-hideopt]')) { S.hideOptional = !S.hideOptional; keepScroll(renderStage); return; }
+  const sv = t.closest('[data-serve]');
+  if (sv) { const r = S.current.recipe, x = r.serveWith?.[+sv.dataset.serve]; if (x) send(L(`Ge mig det kompletta receptet på ${x.name} som tillbehör till ${r.title}, för samma antal portioner.`, `Give me the complete recipe for ${x.name} as a side for ${r.title}, for the same number of servings.`), null, { flow: true, newDish: true }); return; }
+  if (t.closest('[data-drinks]')) { openChat(true); send(L('Föreslå dryck till receptet: fyll "drinks" enligt Dryckestips (typ av dryck, 2–3 flaskor från Systembolaget i vår prisklass och ett alkoholfritt alternativ). Ändra INTE ingredienserna eller stegen. Skicka HELA receptet i "recipe".', 'Suggest drinks for the recipe: fill "drinks" (type of drink, 2–3 bottles from Systembolaget in our price range and an alcohol-free option). Do NOT change the ingredients or the steps. Send the WHOLE recipe in "recipe".'), null, { display: L('🍷 Föreslå dryck', '🍷 Suggest a drink'), enrich: 'drinks' }); return; }
+  if (t.closest('[data-enrich]')) { openChat(true); send(L('Komplettera receptet med översikt, aktiv tid, det som måste göras i förväg, byten för ingredienser, valfria steg, "howTo" för svåra moment, om det går fel, servera med och förvaring. Ändra INTE ingredienserna eller stegen. Skicka HELA receptet i "recipe".', 'Add an overview, active time, what must be done ahead, ingredient swaps, optional steps, "howTo" for tricky techniques, troubleshooting, serve-with ideas and storage to the recipe. Do NOT change the ingredients or the steps. Send the WHOLE recipe in "recipe".'), null, { display: L('Lägg till översikt, byten och tips', 'Add overview, swaps and tips'), enrich: true }); return; }
   // Recept
   const chk = t.closest('[data-check]');
   if (chk) { S.checked[chk.dataset.check] = chk.checked; const row = chk.closest('.ing'); row.classList.toggle('checked', chk.checked); updateCount(); saveSession(); return; }
