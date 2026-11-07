@@ -23,3 +23,14 @@ Nycklarna sparas bara i webbläsaren och följer aldrig med i koden.
 ## Teknik
 
 Statisk HTML/CSS/JS utan byggsteg, publicerad med GitHub Pages. Datan sparas i `localStorage` och kan synkas till en privat Gist.
+
+## Inköpslistan
+
+Egen app på `/lista/` (t.ex. souschefen.pages.dev/lista/) med egen hemskärmsikon, samma Google-inloggning och familj som Souschefen.
+
+- **Från receptet:** "Till inköpslistan" under ingredienserna. Det som finns i skafferiet hamnar under "Har ni troligen hemma" (inte förbockat). Mängder följer valda portioner och dubbletter slås ihop.
+- **Listor:** flera listor (Mat, Bygghandel, Apotek …), snabbinmatning ("mjölk, ägg, 2 avokado"), bocka av i realtid för hela familjen, "I korgen" och Rensa.
+- **Skafferiet:** sparas i Souschefens inställningar. Souschefen kan föreslå basvaror utifrån favoritländerna, märker skafferivaror i recepten, och i inköpslistan fyller man på det som är slut.
+- **Utan täckning:** appen och listan öppnas offline; ändringar skickas när nätet är tillbaka.
+- **Data:** `families/{fid}/lists` och `families/{fid}/items` i Firestore (täcks av befintliga regler).
+
