@@ -1342,9 +1342,9 @@ function drinksBlock(r) {
       <span class="b-links"><a href="${sbSearch(bottleName(b))}" target="_blank" rel="noopener">${L('Hitta på Systembolaget', 'Find at Systembolaget')}</a></span>
     </div>`).join('')}</div>` : ''}
     ${dr.nonAlcoholic ? `<p class="dr-na"><strong>${L('Alkoholfritt', 'Alcohol-free')}:</strong> ${esc(dr.nonAlcoholic)}</p>` : ''}
-    ${S.settings.provider !== 'claude' ? `<div class="wine-find"><button class="ghost" data-winefind ${S.wineBusy ? 'disabled' : ''}>${S.wineBusy ? L('Söker på webben…', 'Searching the web…') : dr.found ? L('🔎 Sök igen', '🔎 Search again') : L('🔎 Hitta flaskor med betyg', '🔎 Find rated bottles')}</button>
+    ${S.settings.provider !== 'claude' ? `<div class="wine-find"><button class="ghost" data-winefind ${S.wineBusy ? 'disabled' : ''}>${S.wineBusy ? L('Läser Munskänkarnas provningar…', 'Reading Munskänkarna\'s tastings…') : dr.found ? L('🔎 Sök igen', '🔎 Search again') : L('🔎 Hitta flaskor med betyg', '🔎 Find rated bottles')}</button>
       ${S.wineErr ? `<p class="wine-err">${esc(S.wineErr)}</p>` : ''}</div>` : ''}
-    <p class="hint">${dr.found ? L('Betygen kommer från källorna som länkas. Kontrollera pris och sortiment på Systembolaget.', 'Ratings come from the linked sources. Check price and range at Systembolaget.') : L('Flaskorna är souschefens förslag och kan ha utgått. Länkarna söker på namnet, och stilen ovan hjälper dig välja om flaskan saknas.', 'The bottles are the sous-chef\'s suggestions and may have been discontinued. The links search by name, and the style above helps you choose if a bottle is missing.')}</p>
+    <p class="hint">${dr.found ? L('Betygen kommer från Munskänkarnas provningar (skala 20). Tillfälliga viner kan ta slut, så kontrollera på Systembolaget.', 'Ratings come from Munskänkarna\'s tastings (out of 20). Limited wines can sell out, so check at Systembolaget.') : L('Flaskorna är souschefens förslag och kan ha utgått. Länkarna söker på namnet, och stilen ovan hjälper dig välja om flaskan saknas.', 'The bottles are the sous-chef\'s suggestions and may have been discontinued. The links search by name, and the style above helps you choose if a bottle is missing.')}</p>
   </div>`;
 }
 // Flaskor med betyg: Gemini söker på webben (Google-sökning) och anger källa för varje betyg.
@@ -1352,15 +1352,57 @@ function foundBlock(dr) {
   const f = dr.found; if (!f) return '';
   const when = new Date(f.at).toLocaleDateString(LOCALE(), { day: 'numeric', month: 'short' });
   return `<h4 class="dr-sub">${L('Flaskor med betyg', 'Rated bottles')} <span class="muted">${L(`sökt ${when}`, `searched ${when}`)}</span></h4>
-    ${f.unverified ? `<p class="wine-err">${L('Souschefen kunde inte söka på webben den här gången, så betygen kan vara gissningar.', 'The sous-chef could not search the web this time, so the ratings may be guesses.')}</p>` : ''}
+    ${f.unverified ? `<p class="wine-err">${L('Souschefen kunde inte läsa provningarna den här gången, så betygen kan vara gissningar.', 'The sous-chef could not read the tastings this time, so the ratings may be guesses.')}</p>` : ''}
     <div class="bottles">${f.bottles.map(b => `<div class="bottle">
       <strong>${esc(bottleName(b))}</strong>
       ${[b.kind, b.country, b.price].filter(Boolean).length || b.temporary ? `<span class="b-meta">${esc([b.kind, b.country, b.price].filter(Boolean).join(', '))}${b.temporary ? ` <span class="tag">${L('Tillfälligt', 'Limited')}</span>` : ''}</span>` : ''}
       ${b.rating ? `<span class="b-rating">★ ${esc(b.rating)}${b.ratingSource ? ` <span class="muted">${esc(b.ratingSource)}</span>` : ''}</span>` : ''}
       ${b.why ? `<span class="b-why">${esc(b.why)}</span>` : ''}
-      <span class="b-links"><a href="${sbSearch(bottleName(b))}" target="_blank" rel="noopener">${L('Hitta på Systembolaget', 'Find at Systembolaget')}</a>${b.sourceUrl ? ` <a class="b-alt" href="${esc(b.sourceUrl)}" target="_blank" rel="noopener">${L('Recension', 'Review')}</a>` : ''}</span>
+      <span class="b-links"><a href="${sbSearch(b.nr || bottleName(b))}" target="_blank" rel="noopener">${L('Hitta på Systembolaget', 'Find at Systembolaget')}</a>${b.sourceUrl ? ` <a class="b-alt" href="${esc(b.sourceUrl)}" target="_blank" rel="noopener">${L('Provningen', 'The tasting')}</a>` : ''}</span>
     </div>`).join('')}</div>
     ${f.na ? `<p class="dr-na"><strong>${L('Alkoholfritt', 'Alcohol-free')}:</strong> <a href="${sbSearch(f.na.name)}" target="_blank" rel="noopener">${esc(f.na.name)}</a>${f.na.why ? ` – ${esc(f.na.why)}` : ''}</p>` : ''}`;
+}
+// Flaskor med betyg från Munskänkarnas Vinlocus. Googles webbsökning ingår inte i Geminis gratisnivå,
+// men uppläsning av angivna sidor (url_context) gör det. Vinlocus har betyg, pris och artikelnummer.
+const VINLOCUS = 'https://munskankarna.se/sv/vinlocus/';
+const VINLOCUS_INDEX = VINLOCUS + 'provningstyp';
+async function geminiRead(prompt, key) {
+  const body = JSON.stringify({ tools: [{ url_context: {} }], contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2 } });
+  const models = [...new Set([S.settings.geminiModel || DEFAULT_MODELS.gemini, ...GEMINI_FALLBACKS])];
+  let lastErr = '';
+  for (const model of models) {
+    let res;
+    try { res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body }); }
+    catch { throw new Error(L('Kunde inte nå Google. Kontrollera internetuppkopplingen.', 'Could not reach Google. Check your internet connection.')); }
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({})), msg = j.error?.message || String(res.status);
+      console.warn('Vinlocus:', model, res.status, msg);
+      if (/api key|API_KEY/i.test(msg)) throw new Error(L('Google säger att nyckeln är ogiltig.', 'Google says the key is invalid.'));
+      lastErr = res.status === 429 ? L('Gratiskvoten är slut för stunden. Försök igen om en stund.', 'The free quota is used up for now. Try again in a while.') : `${model}: ${msg}`;
+      continue;
+    }
+    const c = (await res.json()).candidates?.[0];
+    const txt = (c?.content?.parts || []).filter(p => !p.thought && p.text).map(p => p.text).join('');
+    const meta = (c?.urlContextMetadata || c?.url_context_metadata || {});
+    const read = (meta.urlMetadata || meta.url_metadata || []).filter(m => /SUCCESS/.test(m.urlRetrievalStatus || m.url_retrieval_status || '')).map(m => m.retrievedUrl || m.retrieved_url);
+    let o = null; { const a = txt.indexOf('{'), b = txt.lastIndexOf('}'); if (a >= 0 && b > a) { try { o = JSON.parse(txt.slice(a, b + 1)); } catch { o = null; } } }
+    if (o) return { o, read };
+    lastErr = L('Svaret gick inte att tolka.', 'The answer could not be read.'); console.warn('Vinlocus: ej JSON', model, txt.slice(0, 300));
+  }
+  throw new Error(lastErr || L('Det gick inte att läsa Munskänkarna.', 'Could not read Munskänkarna.'));
+}
+// Senaste provningarna (sparas ett dygn på enheten)
+async function vinlocusReports(key) {
+  try { const c = JSON.parse(localStorage.getItem('fk.vinlocus') || 'null'); if (c && Date.now() - c.t < 864e5 && c.reports?.length) return c.reports; } catch { /* ingen cache */ }
+  const { o } = await geminiRead(`Läs sidan ${VINLOCUS_INDEX}
+Lista provningsrapporterna på sidan med titel, typ och exakt URL, i den ordning de står (nyast först om sidan sorterar så).
+Typ är en av: tillfalligt, fast, hitlista, order, webb, lokalt, tema.
+Svara ENDAST med JSON: {"reports":[{"title":"Tillfälligt sortiment 6 november 2026","type":"tillfalligt","url":"https://munskankarna.se/sv/vinlocus/..."}]}`, key);
+  const reports = (Array.isArray(o.reports) ? o.reports : []).filter(r => r && typeof r.url === 'string' && r.url.startsWith(VINLOCUS) && r.url !== VINLOCUS_INDEX)
+    .map(r => ({ title: String(r.title || ''), type: String(r.type || ''), url: r.url }));
+  if (!reports.length) throw new Error(L('Hittade inga provningar hos Munskänkarna.', 'Found no tastings at Munskänkarna.'));
+  try { localStorage.setItem('fk.vinlocus', JSON.stringify({ t: Date.now(), reports })); } catch { /* full lagring */ }
+  return reports;
 }
 async function findBottles() {
   const r = S.current.recipe; if (!r?.drinks || S.wineBusy) return;
@@ -1368,56 +1410,35 @@ async function findBottles() {
   if (!key) { S.wineErr = L('Souschefen behöver en Gemini-nyckel. Lägg in den under Inställningar.', 'The sous-chef needs a Gemini key. Add it under Settings.'); keepScroll(renderStage); return; }
   S.wineBusy = true; S.wineErr = ''; keepScroll(renderStage);
   const P = S.data.prefs, dr = r.drinks, price = (DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1];
-  const prompt = `Du är sommelier i Sverige. Sök på webben och hitta 2–4 flaskor som passar till "${r.title}"${r.origin ? ` (${r.origin})` : ''}.
-Stil som passar: ${dr.style}${dr.lookFor ? `\nLeta efter: ${dr.lookFor}` : ''}
-Krav:
-- Flaskan går att köpa på Systembolaget nu, i fasta eller tillfälliga sortimentet. Kontrollera gärna på systembolaget.se.
-- Pris per flaska: ${price}.
-- Flaskan har ett publicerat betyg eller en recension från en namngiven källa, t.ex. Munskänkarna (Vinlocus), Allt om Vin, DN, Vivino eller en etablerad vinskribent. Skriv betyget exakt som källan anger det.
-- Använd bara det du hittar i sökresultaten. Hitta aldrig på betyg, priser, flaskor eller länkar. Hellre färre flaskor.
-${P.drinkNA ? '- Ge också ett alkoholfritt alternativ som finns på Systembolaget.\n' : ''}${L('', '- Write "why" and "kind" in English.\n')}Svara ENDAST med JSON, utan annan text:
-{"bottles":[{"producer":"","name":"","kind":"Rött vin","country":"","price":"149 kr","rating":"17/20","ratingSource":"Munskänkarna","sourceUrl":"https://…","temporary":false,"why":"kort varför den passar"}],"nonAlcoholic":{"name":"","why":""}}`;
-  const body = JSON.stringify({ tools: [{ google_search: {} }], contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } });
-  const models = [...new Set([S.settings.geminiModel || DEFAULT_MODELS.gemini, ...GEMINI_FALLBACKS])];
-  let lastErr = '', result = null;
   try {
-    for (const model of models) {
-      let res;
-      try { res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body }); }
-      catch { lastErr = L('Kunde inte nå Google. Kontrollera internetuppkopplingen.', 'Could not reach Google. Check your internet connection.'); break; }
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({})), msg = j.error?.message || String(res.status);
-        console.warn('Vinsökning:', model, res.status, msg);
-        if (/api key|API_KEY/i.test(msg)) { lastErr = L('Google säger att nyckeln är ogiltig.', 'Google says the key is invalid.'); break; }
-        lastErr = res.status === 429 ? L('Gratiskvoten för webbsökning är slut för stunden. Försök igen senare.', 'The free web search quota is used up for now. Try again later.') : `${model}: ${msg}`;
-        continue;
-      }
-      const j = await res.json(), c = j.candidates?.[0];
-      const txt = (c?.content?.parts || []).filter(p => !p.thought && p.text).map(p => p.text).join('');
-      const chunks = (c?.groundingMetadata?.groundingChunks || []).map(x => x.web).filter(w => w?.uri);
-      let o = null; { const a = txt.indexOf('{'), b = txt.lastIndexOf('}'); if (a >= 0 && b > a) { try { o = JSON.parse(txt.slice(a, b + 1)); } catch { o = null; } } }
-      const list = Array.isArray(o?.bottles) ? o.bottles : [];
-      if (!list.length) { lastErr = L('Hittade inga flaskor som uppfyllde kraven.', 'Found no bottles that met the requirements.'); console.warn('Vinsökning: tomt', model, txt.slice(0, 300)); continue; }
-      result = { list, chunks, na: o.nonAlcoholic }; break;
-    }
-  } finally { S.wineBusy = false; }
-  if (!result) { S.wineErr = lastErr || L('Sökningen misslyckades.', 'The search failed.'); keepScroll(renderStage); return; }
-  // Länka bara till källor som faktiskt fanns bland sökresultaten
-  const plain = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^www\./, '').replace(/[^a-z0-9.]/g, '');
-  const hosts = result.chunks.map(w => ({ host: plain(w.title), uri: w.uri }));
-  const srcUrl = b => {
-    try { const h = plain(new URL(b.sourceUrl).hostname); if (hosts.some(x => x.host && (h === x.host || h.endsWith('.' + x.host)))) return b.sourceUrl; } catch { /* ingen giltig länk */ }
-    const name = plain(b.ratingSource).replace(/\./g, '');
-    const hit = name && hosts.find(x => x.host.replace(/\./g, '').includes(name.slice(0, 8)));
-    return hit ? hit.uri : null;
-  };
-  const str = x => typeof x === 'string' && x.trim() && !/^(null|none)$/i.test(x.trim()) ? x.trim() : null;
-  const bottles = result.list.filter(b => b && str(b.name)).slice(0, 4).map(b => ({ producer: str(b.producer), name: str(b.name), kind: str(b.kind), country: str(b.country), price: str(b.price),
-    rating: str(b.rating), ratingSource: str(b.ratingSource), sourceUrl: srcUrl(b), temporary: b.temporary === true, why: str(b.why) }));
-  const na = result.na && str(result.na.name) ? { name: str(result.na.name), why: str(result.na.why) } : null;
-  r.drinks.found = { at: now(), bottles, na, unverified: !result.chunks.length };
-  if (S.current.recipeSavedId) S.current.dirty = true;
-  saveCurrent(); keepScroll(renderStage);
+    const all = await vinlocusReports(key);
+    const pick = (type, n) => all.filter(x => x.type === type).slice(0, n);
+    const reports = [...pick('hitlista', 2), ...pick('tillfalligt', 3), ...pick('fast', 1)];
+    const use = reports.length ? reports : all.slice(0, 5);
+    const { o, read } = await geminiRead(`Du är sommelier. Läs Munskänkarnas provningar nedan och välj 2–4 viner (eller annan dryck) som passar till "${r.title}"${r.origin ? ` (${r.origin})` : ''}.
+Stil som passar: ${dr.style}${dr.lookFor ? `\nLeta efter: ${dr.lookFor}` : ''}
+Pris per flaska: ${price}. Välj helst viner med högt betyg och märkningen Prisvärt.
+Provningar:
+${use.map(x => `- ${x.title}: ${x.url}`).join('\n')}
+Regler: Använd BARA viner som står på sidorna. Skriv betyg, pris och Systembolagets artikelnummer exakt som sidan anger. Hitta aldrig på något. Hellre färre viner.
+${L('', 'Write "why" and "kind" in English.\n')}Svara ENDAST med JSON:
+{"bottles":[{"producer":"","name":"","vintage":"2023","kind":"Rött vin","country":"","price":"159 kr","score":"15/20","nr":"95677","report":"URL till provningen där vinet står","why":"kort varför det passar till rätten"}]}`, key);
+    const byUrl = Object.fromEntries(use.map(x => [x.url, x]));
+    const str = x => typeof x === 'string' && x.trim() && !/^(null|none)$/i.test(x.trim()) ? x.trim() : (typeof x === 'number' ? String(x) : null);
+    // Bara viner som pekar på en av provningarna vi skickade – annat kan vara påhittat
+    const bottles = (Array.isArray(o.bottles) ? o.bottles : []).filter(b => b && str(b.name) && byUrl[str(b.report)]).slice(0, 4).map(b => {
+      const rep = byUrl[str(b.report)] || null, nr = String(b.nr || '').replace(/\s/g, '');
+      const score = str(b.score);
+      return { producer: str(b.producer), name: [str(b.name), str(b.vintage)].filter(Boolean).join(' '), kind: str(b.kind), country: str(b.country), price: str(b.price),
+        rating: score ? (/\//.test(score) ? score : `${score}/20`) : null, ratingSource: 'Munskänkarna', sourceUrl: rep ? rep.url : null,
+        nr: /^\d{3,8}$/.test(nr) ? nr : null, temporary: rep?.type === 'tillfalligt', why: str(b.why) };
+    });
+    if (!bottles.length) throw new Error(L('Hittade inga viner som passade i Munskänkarnas senaste provningar.', 'Found no matching wines in Munskänkarna\'s latest tastings.'));
+    r.drinks.found = { at: now(), bottles, na: null, unverified: !read.length, source: 'vinlocus' };
+    if (S.current.recipeSavedId) S.current.dirty = true;
+    saveCurrent();
+  } catch (e) { S.wineErr = e.message || String(e); }
+  finally { S.wineBusy = false; keepScroll(renderStage); }
 }
 const fmtMin = m => m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
 function notesBox(saved) {
