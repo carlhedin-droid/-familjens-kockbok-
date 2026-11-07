@@ -18,6 +18,8 @@ const EN_VALUES = {
   'Färsk jäst': 'Fresh yeast', 'Torrjäst': 'Dry yeast', 'Surdeg': 'Sourdough', 'Förjäsning (poolish/biga)': 'Pre-ferment (poolish/biga)',
   'Vetemjöl': 'Wheat flour', 'Rågmjöl': 'Rye flour', 'Dinkel': 'Spelt', 'Fullkorn': 'Whole grain', 'Durum': 'Durum', 'Ölandsvete': 'Öland wheat',
   'Under 120 kr': 'Under SEK 120', '120–200 kr': 'SEK 120–200', '200–350 kr': 'SEK 200–350', 'Över 350 kr': 'Over SEK 350',
+  'Rött': 'Red', 'Vitt': 'White', 'Rosé': 'Rosé', 'Mousserande': 'Sparkling', 'Öl': 'Beer', 'Cider': 'Cider', 'Glasflaska': 'Glass bottle', 'Box': 'Box',
+  'Fast sortiment': 'Regular range', 'Tillfälligt sortiment': 'Limited releases', 'Beställningssortiment': 'Order range',
   'Mjukt & bärigt': 'Soft & berry', 'Fruktigt & smakrikt': 'Fruity & flavourful', 'Kryddigt & mustigt': 'Spicy & robust', 'Stramt & nyanserat': 'Firm & nuanced', 'Friskt & fruktigt': 'Fresh & fruity', 'Fylligt & smakrikt': 'Full & flavourful', 'Torrt': 'Dry',
   'Bakstål': 'Baking steel', 'Ånga i ugnen': 'Steam in the oven', 'Plåt': 'Baking tray', 'Form': 'Loaf tin',
   'Efter receptet': 'Follow the recipe', 'Samma dag': 'Same day', 'Över natten i kyl': 'Overnight in the fridge', '1–3 dygn i kyl': '1–3 days in the fridge',
@@ -240,7 +242,11 @@ const BREAD_OPT = {
   hydration: [['', 'Efter receptet'], ['fast', 'Fast, ca 60–65 %'], ['mellan', 'Mellan, ca 65–75 %'], ['hog', 'Hög, över 75 %']],
 };
 const DRINK_PRICES = [['budget', 'Under 120 kr'], ['mellan', '120–200 kr'], ['bra', '200–350 kr'], ['fest', 'Över 350 kr']];
-const DRINK_DEFAULTS = { drinkPrice: 'mellan', drinkNA: true, drinkWeekday: false, drinkEco: false, drinkGlass: false };
+const DRINK_DEFAULTS = { drinkPrice: 'mellan', drinkNA: true, drinkWeekday: false, drinkEco: false, drinkLike: [], drinkLikes: '', drinkAvoid: '', drinkPack: [], drinkRange: [] };
+const DRINK_KINDS = ['Rött', 'Vitt', 'Rosé', 'Mousserande', 'Öl', 'Cider'];
+const DRINK_PACKS = { 'Glasflaska': 'glasflaska', 'Box': 'box' };
+const DRINK_RANGES = { 'Fast sortiment': 'Fast sortiment', 'Tillfälligt sortiment': 'Tillfälligt sortiment', 'Beställningssortiment': 'Ordervaror' };
+const drinkArr = (P, k) => Array.isArray(P[k]) ? P[k] : (P[k] = []);
 const BREAD_DEFAULTS = { breadLeaven: [], breadStarter: false, breadProof: '', breadKnead: '', breadHydration: '', breadFlour: [], breadBake: [], breadNote: '' };
 const CARL_PREFS = {
   portions: 4, bigEaters: true, foodieAdded: true,
@@ -426,6 +432,7 @@ function migrateData() {
     if (known.length) { P0.equipment = [...new Set([...(P0.equipment || []), ...known])]; P0.customEquipment = P0.customEquipment.filter(e => !allE.includes(e)); }
   }
   S.data.prefs = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)), S.data.prefs || {});
+  if ('drinkGlass' in S.data.prefs) { if (S.data.prefs.drinkGlass && !S.data.prefs.drinkPack.length) S.data.prefs.drinkPack = ['Glasflaska']; delete S.data.prefs.drinkGlass; }
   if (S.data.instructions === LEGACY_INSTRUCTIONS || S.data.instructions === INSTRUCTIONS_V2 || S.data.instructions === INSTRUCTIONS_V3) S.data.instructions = DEFAULT_INSTRUCTIONS;
   if (/^Periodisk fasta och styrketräning\. Mål: viktminskning/.test(S.data.prefs.healthNote || '')) S.data.prefs.healthNote = DEFAULT_HEALTH;
   if (S.data.profile === DEFAULT_PROFILE_V2 || S.data.profile === PROFILE_V3) S.data.profile = CARL_PROFILE;
@@ -727,7 +734,7 @@ function prefsText(d) {
 - Favoritländer (sprid förslagen över dessa kök): ${P.cuisines.join(', ') || 'alla'}
 - Standardutrustning (finns alltid): ${STANDARD_KITCHEN}
 - Specialutrustning vi har: ${equip.join(', ') || 'ingen utöver standard'}${breadText(P)}
-- Dryckestips: ${d.weekend || P.drinkWeekday ? `JA – fyll "drinks" i varje recept. Prisklass per flaska: ${(DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1]}${P.drinkNA ? '. Ge alltid ett alkoholfritt alternativ' : ''}` : 'nej – sätt "drinks" till null om vi inte ber om det'}`;
+- Dryckestips: ${d.weekend || P.drinkWeekday ? `JA – fyll "drinks" i varje recept. Prisklass per flaska: ${(DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1]}${P.drinkNA ? '. Ge alltid ett alkoholfritt alternativ' : ''}${drinkArr(P, 'drinkLike').length ? `. Vi dricker helst: ${P.drinkLike.join(', ')} – lägg dem först och föreslå bara annat när maten verkligen kräver det (säg då varför)` : ''}${(P.drinkLikes || '').trim() ? `. Vi gillar: ${P.drinkLikes.trim()}` : ''}${(P.drinkAvoid || '').trim() ? `. Vi undviker: ${P.drinkAvoid.trim()}` : ''}${drinkArr(P, 'drinkRange').length ? `. Vi handlar gärna i: ${P.drinkRange.join(', ')}` : ''}` : 'nej – sätt "drinks" till null om vi inte ber om det'}`;
 }
 function stripRecipe(r) {
   const { id, savedAt, updatedAt, notes, rating, cooked, ...rest } = r;
@@ -1368,8 +1375,11 @@ function sbLinks(o, dr) {
   const region = country && SB_REGION[country] ? SB_REGION[country][fold(o.region)] || '' : '';
   const food = wine && SB_FOOD[dr?.food] ? dr.food : '';
   const grape = wine && o.grape && /^[\p{L}][\p{L} '\-]{1,30}$/u.test(o.grape) ? o.grape.trim() : '';
-  const prefs = wine ? [P.drinkGlass && 'glasflaska', P.drinkEco && 'ekologiskt'].filter(Boolean) : [];
-  const url = (segs, q = '') => `${SB}/sortiment/${[base, ...segs, ...prefs].filter(Boolean).join('/')}/${q}`;
+  const packs = drinkArr(P, 'drinkPack'), ranges = drinkArr(P, 'drinkRange');
+  const prefs = wine ? [packs.length === 1 && DRINK_PACKS[packs[0]], P.drinkEco && 'ekologiskt'].filter(Boolean) : [];
+  // Sortiment som frågeparameter (Systembolaget skriver flera val som "A_eller_B")
+  const rangeQ = wine && ranges.length && ranges.length < Object.keys(DRINK_RANGES).length ? 'sortiment=' + ranges.map(r => encodeURIComponent(DRINK_RANGES[r]).replace(/%20/g, '+')).join('_eller_') : '';
+  const url = (segs, q = '', all = false) => { const qs = [q.replace(/^\?/, ''), all ? '' : rangeQ].filter(Boolean).join('&'); return `${SB}/sortiment/${[base, ...segs, ...prefs].filter(Boolean).join('/')}/${qs ? '?' + qs : ''}`; };
   const cLabel = country ? (COUNTRY_LABEL[country] || country.charAt(0).toUpperCase() + country.slice(1)) : '';
   const rLabel = region ? o.region.trim() : '';
   const where = rLabel || tv(cLabel);
@@ -1378,7 +1388,8 @@ function sbLinks(o, dr) {
   const main = { url: url([taste, country, region]), label: mainBits.length ? L(`Visa ${mainBits.join(' från ')} på Systembolaget`, `Show ${mainBits.join(' from ')} at Systembolaget`) : L('Visa på Systembolaget', 'Show at Systembolaget') };
   const extra = [];
   if (food) extra.push({ url: url([taste, food]), label: L(`Till ${SB_FOOD[food].toLowerCase()}`, `For ${EN_FOOD[SB_FOOD[food]]}`) });
-  if (grape) extra.push({ url: url([], `?druva=${encodeURIComponent(grape)}`), label: L(`Druva: ${esc(grape)}`, `Grape: ${esc(grape)}`) });
+  if (grape) extra.push({ url: url([], `druva=${encodeURIComponent(grape)}`), label: L(`Druva: ${esc(grape)}`, `Grape: ${esc(grape)}`) });
+  if (rangeQ) extra.push({ url: url([taste, country, region], '', true), label: L('Hela sortimentet', 'Whole range') });
   return { main, extra };
 }
 function drinksBlock(r) {
@@ -1396,7 +1407,7 @@ function drinksBlock(r) {
     ${dr.options.length ? `<div class="drink-list">${dr.options.map(card).join('')}</div>` : ''}
     ${dr.priceTip ? `<p class="dr-price"><strong>${L('I din prisklass', 'In your price range')}:</strong> ${esc(dr.priceTip)}</p>` : ''}
     ${dr.nonAlcoholic ? `<h4 class="dr-sub">${L('Alkoholfritt', 'Alcohol-free')}</h4><div class="drink-list">${card(dr.nonAlcoholic)}</div>` : ''}
-    <p class="hint">${L('Länkarna öppnar Systembolagets sortiment filtrerat på typ, stil, område och mat', 'The links open Systembolaget\'s range filtered by type, style, region and food')}${S.data.prefs.drinkEco || S.data.prefs.drinkGlass ? L(` (${[S.data.prefs.drinkEco && 'ekologiskt', S.data.prefs.drinkGlass && 'glasflaska'].filter(Boolean).join(', ')})`, ` (${[S.data.prefs.drinkEco && 'organic', S.data.prefs.drinkGlass && 'glass bottle'].filter(Boolean).join(', ')})`) : ''}. ${L('Sortera på pris där och välj flaska.', 'Sort by price there and pick a bottle.')}</p>
+    <p class="hint">${L('Länkarna öppnar Systembolagets sortiment filtrerat på typ, stil, område och mat', 'The links open Systembolaget\'s range filtered by type, style, region and food')}${(() => { const P = S.data.prefs, bits = [...drinkArr(P, 'drinkRange'), ...(drinkArr(P, 'drinkPack').length === 1 ? P.drinkPack : []), P.drinkEco && 'Ekologiskt'].filter(Boolean).map(x => tv(x).toLowerCase()); return bits.length ? ` (${bits.join(', ')})` : ''; })()}. ${L('Sortera på pris där och välj flaska.', 'Sort by price there and pick a bottle.')}</p>
   </div>`;
 }
 const fmtMin = m => m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
@@ -1503,7 +1514,7 @@ function secSummary(key) {
     case 'health': return P.healthNote.trim() ? (P.healthWho.trim() ? `${P.healthWho.trim()}: ` : '') + P.healthNote.trim() : L('Inget mål', 'No goal');
     case 'cuisines': return list(P.cuisines, L('Alla kök', 'All cuisines'));
     case 'equipment': return list([...P.equipment, ...P.customEquipment], L('Vanligt kök', 'Regular kitchen'));
-    case 'drinks': return tv((DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1]) + (P.drinkNA ? L(', alkoholfritt alternativ', ', alcohol-free option') : '') + (P.drinkWeekday ? L(', även vardag', ', weekdays too') : '') + (P.drinkEco ? L(', ekologiskt', ', organic') : '') + (P.drinkGlass ? L(', glasflaska', ', glass bottle') : '');
+    case 'drinks': return tv((DRINK_PRICES.find(x => x[0] === P.drinkPrice) || DRINK_PRICES[1])[1]) + (P.drinkNA ? L(', alkoholfritt alternativ', ', alcohol-free option') : '') + (P.drinkWeekday ? L(', även vardag', ', weekdays too') : '') + (drinkArr(P, 'drinkLike').length ? ', ' + P.drinkLike.map(tv).join('/').toLowerCase() : '') + (drinkArr(P, 'drinkRange').length ? ', ' + P.drinkRange.map(tv).join('/').toLowerCase() : '') + (drinkArr(P, 'drinkPack').length === 1 ? ', ' + tv(P.drinkPack[0]).toLowerCase() : '') + (P.drinkEco ? L(', ekologiskt', ', organic') : '');
     case 'bread': { const b = [...P.breadLeaven.map(tv), lab(BREAD_OPT.proof, P.breadProof), lab(BREAD_OPT.knead, P.breadKnead), lab(BREAD_OPT.hydration, P.breadHydration), ...P.breadFlour.map(tv), ...P.breadBake.map(tv)].filter(Boolean);
       return b.length ? b.join(', ') : L('Efter receptet', 'Follow the recipe'); }
     case 'memory': { const n = S.data.memory.filter(m => !m.deleted).length;
@@ -1524,6 +1535,7 @@ function sec(key, title, body) {
 }
 function prefsSections() {
   const P = S.data.prefs;
+  ['drinkLike', 'drinkPack', 'drinkRange'].forEach(k => drinkArr(P, k));
   const chip = (key, val, label = tv(val)) => `<button type="button" class="chip opt" data-ptoggle="${key}" data-val="${esc(val)}" aria-pressed="${P[key].includes(val)}">${esc(label)}</button>`;
   const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([k, l]) => `<button type="button" data-pset="${key}" data-val="${k}" aria-pressed="${P[key] === k}">${k === 'lang' ? L('Eftermiddag', 'Afternoon') : tv(l)}</button>`).join('')}</div>`;
   const sel = (key, label, opts) => `<div class="field"><label for="${key}">${label}</label><select id="${key}" data-psel="${key}">${opts.map(([k, l]) => `<option value="${k}"${P[key] === k ? ' selected' : ''}>${esc(tv(l))}</option>`).join('')}</select></div>`;
@@ -1560,9 +1572,12 @@ function prefsSections() {
       <div class="sel-grid">${sel('drinkPrice', L('Pris per flaska', 'Price per bottle'), DRINK_PRICES)}</div>
       <div class="chips"><button type="button" class="chip opt" data-pbool="drinkNA" aria-pressed="${P.drinkNA}">${L('Alltid ett alkoholfritt alternativ', 'Always an alcohol-free option')}</button>
         <button type="button" class="chip opt" data-pbool="drinkWeekday" aria-pressed="${P.drinkWeekday}">${L('Även på vardagar', 'On weekdays too')}</button></div>
-      <div class="opt-group" style="margin-top:14px"><h3>${L('Filter i länkarna till Systembolaget', 'Filters in the Systembolaget links')}</h3><div class="chips">
-        <button type="button" class="chip opt" data-pbool="drinkEco" aria-pressed="${P.drinkEco}">${L('Bara ekologiskt', 'Organic only')}</button>
-        <button type="button" class="chip opt" data-pbool="drinkGlass" aria-pressed="${P.drinkGlass}">${L('Bara glasflaska, inte box', 'Glass bottles only, no box')}</button></div></div>`),
+      <div class="opt-group" style="margin-top:14px"><h3>${L('Vi dricker helst', 'We prefer')}</h3><div class="chips">${DRINK_KINDS.map(v => chip('drinkLike', v)).join('')}</div></div>
+      <div class="field"><label for="drinkLikes">${L('Vi gillar', 'We like')}</label><input id="drinkLikes" data-ptext="drinkLikes" value="${esc(P.drinkLikes || '')}" placeholder="${L('T.ex. friskt och syrligt, Riesling, Piemonte, naturvin', 'E.g. fresh and crisp, Riesling, Piedmont, natural wine')}"></div>
+      <div class="field"><label for="drinkAvoid">${L('Vi undviker', 'We avoid')}</label><input id="drinkAvoid" data-ptext="drinkAvoid" value="${esc(P.drinkAvoid || '')}" placeholder="${L('T.ex. strävt rött, tydlig ek, sött', 'E.g. tannic reds, heavy oak, sweet')}"></div>
+      <div class="opt-group"><h3>${L('Sortiment', 'Range')}</h3><div class="chips">${Object.keys(DRINK_RANGES).map(v => chip('drinkRange', v)).join('')}</div><span class="hint">${L('Länkarna visar bara valda sortiment. Inget valt = allt.', 'Links show only the chosen ranges. None chosen = all.')}</span></div>
+      <div class="opt-group"><h3>${L('Förpackning och märkning', 'Packaging and labels')}</h3><div class="chips">${Object.keys(DRINK_PACKS).map(v => chip('drinkPack', v)).join('')}
+        <button type="button" class="chip opt" data-pbool="drinkEco" aria-pressed="${P.drinkEco}">${L('Ekologiskt', 'Organic')}</button></div></div>`),
     sec('bread', L('Bakning av bröd', 'Bread baking'), `
       <p class="hint ss-lead">${L('Det ni lämnar tomt väljer souschefen efter receptet.', 'Whatever you leave empty, the sous-chef picks to suit the recipe.')}</p>
       <div class="opt-group"><h3>${L('Jäsmedel', 'Leavening')}</h3><div class="chips">${BREAD_OPT.leaven.map(v => chip('breadLeaven', v)).join('')}<button type="button" class="chip opt" data-pbool="breadStarter" aria-pressed="${P.breadStarter}">${L('Levande surdegsgrund', 'Live sourdough starter')}</button></div></div>
