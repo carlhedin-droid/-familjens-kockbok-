@@ -462,7 +462,8 @@ details.adv[open] summary { margin-bottom: 8px; }
 .stage.split .r-intro, .stage.split .r-jump, .stage.split .start-cook, .stage.split .step-hint { display: none; }
 .stage.split .r-split { flex: 1; min-height: 0; display: grid; gap: 16px;
   grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr); grid-template-areas: "steps ing"; }
-.stage.split #r-steps { grid-area: steps; }
+.stage.split .r-main { grid-area: steps; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 16px; }
+.stage.split .r-main .r-sec { overflow: visible; flex: none; }
 .stage.split #r-ing { grid-area: ing; }
 .stage.split .r-sec { margin: 0; overflow-y: auto; overscroll-behavior: contain; padding-top: 0; }
 .stage.split .sec-head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding: 16px 0 10px; margin-bottom: 0; flex-wrap: nowrap; }
@@ -688,3 +689,22 @@ a.howto { text-decoration: none; color: var(--ink); }
 .dr-na { margin: 10px 0 0; }
 .drinks .hint { font-size: 13.5px; color: var(--muted); margin: 8px 0 0; }
 .enrich + .enrich { margin-top: 10px; }
+
+/* ============ Stegrubriker och tipssektion (nov 2026) ============ */
+.step-title { font-family: var(--font-display); font-size: 19px; font-weight: 700; line-height: 1.25; margin: 2px 0 2px; align-self: center; }
+.step-title .tag.optional { vertical-align: 2px; margin: 0 0 0 6px; }
+.step.done .step-title { color: var(--muted); }
+.step-text { color: var(--ink); }
+.r-sec.more { background: var(--surface-2); border-color: transparent; }
+.r-sec.more .sec-head h2 { color: var(--ink); }
+.r-sec.more .extras { margin-top: 4px; }
+.r-sec.more .extras .health { background: var(--surface); }
+.r-sec.more .bottle, .r-sec.more .serve-btn, .r-sec.more .swap { background: var(--surface); }
+.r-sec.more .r-extra:first-child, .r-sec.more .enrich:first-child { margin-top: 4px; }
+.stage.split .r-sec.more .sec-head { background: var(--surface-2); }
+@media (max-width: 420px) {
+  .r-jump { gap: 5px; }
+  .r-jump button { font-size: 15px; gap: 5px; padding: 0 8px; min-height: 44px; }
+  .r-jump button[data-jump="r-tips"] { flex: 0 0 auto; padding: 0 16px; }
+}
+.step > .step-title, .step > .step-text, .step > .step-tools { grid-column: 2; }

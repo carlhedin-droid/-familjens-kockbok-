@@ -57,7 +57,7 @@ function setLang(lang) {
   applyStaticLang(); renderStatus(); renderStage(); renderChat(); renderAttach(); tickTimers();
   const el = $('#sync'); if (el) el.textContent = tv(S.sync.state || '');
 }
-const ENGLISH_RULE = `- LANGUAGE: The app is set to English. Keep "howTo" search terms in English. Write everything the user sees in natural English: "reply", all recipe and suggestion text (title, origin, intro, overview, activeTime, ahead, ingredient names, groups and swaps, steps, health, tips, troubleshoot, serveWith, storage, drinks (style, why, kind, nonAlcoholic; keep bottle names as on the label), why, keyIngredients, equipment) and "learn". This overrides the Swedish examples above, and the instructions being in Swedish does not change it. Use g, kg, ml, l, tbsp and tsp, and "Easy", "Medium" or "Advanced" for "difficulty". Keep "tag" exactly VARDAG or HELG (VARDAG means weekday, HELG means weekend). Family notes may be in Swedish; understand them and answer in English. If a recipe on screen or at a link is in Swedish or another language, translate it when you send it. If information is missing: ask in "reply" and set suggestions/recipe to null.`;
+const ENGLISH_RULE = `- LANGUAGE: The app is set to English. Keep "howTo" search terms in English. Write everything the user sees in natural English: "reply", all recipe and suggestion text (title, origin, intro, step titles, overview, activeTime, ahead, ingredient names, groups and swaps, steps, health, tips, troubleshoot, serveWith, storage, drinks (style, why, kind, nonAlcoholic; keep bottle names as on the label), why, keyIngredients, equipment) and "learn". This overrides the Swedish examples above, and the instructions being in Swedish does not change it. Use g, kg, ml, l, tbsp and tsp, and "Easy", "Medium" or "Advanced" for "difficulty". Keep "tag" exactly VARDAG or HELG (VARDAG means weekday, HELG means weekend). Family notes may be in Swedish; understand them and answer in English. If a recipe on screen or at a link is in Swedish or another language, translate it when you send it. If information is missing: ask in "reply" and set suggestions/recipe to null.`;
 const langRule = () => FORMAT_RULES.replace('- Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.', L('- Svara på svenska. Om info saknas: ställ motfrågan i "reply" och sätt suggestions/recipe till null.', ENGLISH_RULE));
 
 /* ============ Standardtexter ============ */
@@ -283,7 +283,7 @@ const RESPONSE_SCHEMA = {
       overview: S_ARR, activeTime: S_STRN, ahead: S_STRN,
       ingredients: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: S_STR, amount: S_STR, name: S_STR, note: S_STRN, group: S_STRN,
         swaps: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: S_STR, amount: S_STRN, why: S_STR }, required: ['name', 'why'] } } }, required: ['id', 'amount', 'name'] } },
-      steps: { type: 'ARRAY', items: { type: 'OBJECT', properties: { text: S_STR, uses: S_ARR, minutes: { type: 'INTEGER', nullable: true }, optional: { type: 'BOOLEAN' }, howTo: S_STRN }, required: ['text'] } },
+      steps: { type: 'ARRAY', items: { type: 'OBJECT', properties: { title: S_STR, text: S_STR, uses: S_ARR, minutes: { type: 'INTEGER', nullable: true }, optional: { type: 'BOOLEAN' }, howTo: S_STRN }, required: ['title', 'text'] } },
       health: { type: 'OBJECT', nullable: true, properties: { summary: S_STR, tips: S_ARR } },
       tips: S_ARR,
       troubleshoot: { type: 'ARRAY', items: { type: 'OBJECT', properties: { problem: S_STR, fix: S_STR }, required: ['problem', 'fix'] } },
@@ -310,7 +310,7 @@ Du svarar inuti en app. Svara ALLTID med exakt ett JSON-objekt – ingen text f�
     "activeTime": "40 min" | null, "ahead": "Marinera minst 3 h, gärna över natten" | null,
     "ingredients": [ { "id": "i1", "amount": "300 g", "name": "kycklinglårfilé", "note": "i bitar" | null, "group": "Marinad" | null,
       "swaps": [ { "name": "kycklingbröst", "amount": "300 g" | null, "why": "magrare, kortare stektid" } ] } ],
-    "steps": [ { "text": "Bryn 300 g kycklinglårfilé ...", "uses": ["i1"], "minutes": 8 | null, "optional": false, "howTo": "how to sear chicken thighs" | null } ],
+    "steps": [ { "title": "Bryn kycklingen", "text": "Bryn 300 g kycklinglårfilé ...", "uses": ["i1"], "minutes": 8 | null, "optional": false, "howTo": "how to sear chicken thighs" | null } ],
     "health": { "summary": "≈45 g protein och 650 kcal per portion. …", "tips": ["konkret byte för den som vill äta lättare"] },
     "tips": [""],
     "troubleshoot": [ { "problem": "Såsen är för tunn", "fix": "Sjud utan lock 5–10 min." } ],
@@ -334,6 +334,7 @@ Regler:
   - "serveWith": 2–3 tillbehör som passar, med kort varför.
   - "drinks": se Dryckestips i INSTÄLLNINGAR. "style": vilken typ av vin eller dryck som passar och varför (1–2 meningar). "bottles": 2–3 specifika flaskor ur Systembolagets ordinarie sortiment inom prisklassen, väletablerade och med gott rykte. Ange Systembolagets artikelnummer i "nr" BARA om du är säker, annars null – hitta aldrig på nummer. "nonAlcoholic": ett alkoholfritt alternativ (gärna en flaska från Systembolaget eller något hemgjort). Annars null.
   - "storage": hållbarhet i kyl, om den går att frysa (och hur), och en idé för resterna. null om det inte är relevant (t.ex. en dryck).
+- Varje steg har "title": 2–4 ord i imperativ som namnger momentet, t.ex. "Förbered grönsakerna", "Montera lasagnen", "Grädda i ugnen". Upprepa inte rubriken i "text". Även vid renskrivning.
 - I varje steg: skriv ut mängderna i texten och lista ingrediensernas id i "uses". "minutes" anges för steg med vänte-/tillagningstid.
 - "countries": ISO 3166-1 alfa-2-koder (versaler) för rättens ursprungsland, t.ex. ["MY"], ["FR","SE"] för fusion. Regionalt kök → huvudlandet (Sydamerikanskt ceviche → ["PE"]).
 - "group" används för att dela upp ingredienser (t.ex. "Marinad", "Sås", "Servering"); annars null.
@@ -910,7 +911,7 @@ function normalizeRecipe(r) {
   r.ingredients = r.ingredients.map((x, i) => ({ id: String(x.id || `i${i + 1}`), amount: x.amount || '', name: x.name || '', note: x.note || '', group: x.group || '',
     swaps: arr(x.swaps).filter(w => w && str(w.name)).slice(0, 3).map(w => ({ name: str(w.name), amount: str(w.amount), why: str(w.why) || '' })) }));
   r.steps = r.steps.map(s => typeof s === 'string' ? { text: s, uses: [], minutes: null } :
-    { text: s.text || '', uses: Array.isArray(s.uses) ? s.uses.map(String) : [], minutes: Number(s.minutes) > 0 ? Number(s.minutes) : null, optional: s.optional === true, howTo: str(s.howTo) });
+    { title: str(s.title), text: s.text || '', uses: Array.isArray(s.uses) ? s.uses.map(String) : [], minutes: Number(s.minutes) > 0 ? Number(s.minutes) : null, optional: s.optional === true, howTo: str(s.howTo) });
   r.overview = arr(r.overview).map(str).filter(Boolean).slice(0, 4);
   r.activeTime = str(r.activeTime); r.ahead = str(r.ahead);
   r.troubleshoot = arr(r.troubleshoot).filter(t => t && str(t.problem) && str(t.fix)).slice(0, 4).map(t => ({ problem: str(t.problem), fix: str(t.fix) }));
@@ -975,7 +976,7 @@ async function send(text, image, opts = {}) {
       addHistory(recipe, keepId);
       if (!(S.portions && S.portions.title === recipe.title)) S.portions = null;
       msg.view = { recipe };
-      if (flow) msg.hidden = true; else { const d = recipeDiff(prevRecipe, recipe); msg.updated = prevRecipe ? (d.length ? d : opts.enrich === 'drinks' ? [L('dryckestips är tillagda', 'drink suggestions are added')] : opts.enrich ? [L('översikt, byten och tips är tillagda', 'overview, swaps and tips are added')] : 'same') : [L('nytt recept', 'new recipe')]; }
+      if (flow) msg.hidden = true; else { const d = recipeDiff(prevRecipe, recipe); msg.updated = prevRecipe ? (d.length ? d : opts.enrich === 'drinks' ? [L('dryckestips är tillagda', 'drink suggestions are added')] : opts.enrich ? [L('rubriker, översikt och tips är tillagda', 'headings, overview and tips are added')] : 'same') : [L('nytt recept', 'new recipe')]; }
       if (S.route.view !== 'recipe') go('recipe', { keepChat: true }); else { const sc = $('#stage').scrollTop; renderStage(); $('#stage').scrollTop = sc; }
       saveSession();
     } else if (sugg) {
@@ -1247,6 +1248,7 @@ function viewRecipe() {
   <nav class="r-jump" aria-label="${L('Hoppa till', 'Jump to')}">
     <button data-jump="r-ing" class="on">${L('Ingredienser', 'Ingredients')} <span>${checkedCount}/${r.ingredients.length}</span></button>
     <button data-jump="r-steps">${L('Gör så här', 'Method')} <span>${doneCount}/${r.steps.length}</span></button>
+    <button data-jump="r-tips">${L('Tips', 'Tips')}</button>
   </nav>
 
   <div class="r-split">
@@ -1262,18 +1264,24 @@ function viewRecipe() {
     <button class="btn start-cook" data-startcook>${L('Allt är framme – börja laga', 'Everything is out – start cooking')}</button>
   </section>
 
+  <div class="r-main">
   <section class="r-sec steps" id="r-steps" aria-label="${L('Gör så här', 'Method')}">
     <div class="sec-head"><h2>${L('Gör så här', 'Method')}</h2><span class="muted step-hint">${L('Tryck på ett steg för att markera var du är', 'Tap a step to mark where you are')}</span>${stepper}</div>
     ${r.steps.some(s => s.optional) ? `<button type="button" class="chip opt opt-toggle" data-hideopt aria-pressed="${!!S.hideOptional}">${L('Dölj steg som kan hoppas över', 'Hide optional steps')}</button>` : ''}
     <ol>${r.steps.map((s, k) => `
       <li class="step ${S.activeStep === k ? 'active' : ''} ${S.doneSteps[k] ? 'done' : ''}" data-step="${k}" data-n="${k + 1}" ${s.optional && S.hideOptional ? 'hidden' : ''}>
-        <div class="step-text">${s.optional ? `<span class="tag optional">${L('Kan hoppas över', 'Optional')}</span>` : ''}${highlightAmounts(scaleStepText(s.text, f))}</div>
+        ${s.title ? `<h3 class="step-title">${esc(s.title)}${s.optional ? ` <span class="tag optional">${L('Kan hoppas över', 'Optional')}</span>` : ''}</h3>` : ''}
+        <div class="step-text">${s.optional && !s.title ? `<span class="tag optional">${L('Kan hoppas över', 'Optional')}</span>` : ''}${highlightAmounts(scaleStepText(s.text, f))}</div>
         <div class="step-tools">
           ${s.howTo ? `<a class="ghost howto" href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.howTo)}" target="_blank" rel="noopener">▶ ${L('Visa hur', 'Show me')}</a>` : ''}
           ${s.minutes ? `<button class="ghost" data-timer="${k}">⏱ ${fmtMin(s.minutes)}</button>` : ''}
           <button class="ghost" data-done="${k}">${S.doneSteps[k] ? L('Ångra', 'Undo') : L('Klar', 'Done')}</button>
         </div>
       </li>`).join('')}</ol>
+  </section>
+
+  <section class="r-sec more" id="r-tips" aria-label="${L('Tips', 'Tips')}">
+    <div class="sec-head"><h2>${L('Tips', 'Tips')}</h2></div>
     ${r.health || r.tips?.length ? `<div class="extras">
       ${r.health ? `<div class="health"><h3>${esc(healthLabel())}</h3>${r.health.summary ? `<div>${md(r.health.summary)}</div>` : ''}
         ${r.health.tips?.length ? `<ul>${r.health.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>` : ''}
@@ -1282,6 +1290,7 @@ function viewRecipe() {
     ${recipeAfter(r)}
     ${saved ? `<div class="notes-wrap">${notesBox(saved)}</div>` : ''}
   </section>
+  </div>
   </div>
   </article>`;
 }
@@ -1298,9 +1307,10 @@ function swapPanel(i, f) {
 // Efter stegen: om det går fel, servera med, förvaring – eller en knapp som kompletterar äldre recept
 function recipeAfter(r) {
   const has = r.troubleshoot?.length || r.serveWith?.length || r.storage || r.overview?.length;
-  if (!has) return drinksBlock(r) + `<div class="enrich"><button class="ghost" data-enrich>${L('Lägg till översikt, byten och tips', 'Add overview, swaps and tips')}</button></div>`;
+  const enrich = !has || !r.steps.some(x => x.title) ? `<div class="enrich"><button class="ghost" data-enrich>${L('Lägg till stegrubriker, översikt och tips', 'Add step headings, overview and tips')}</button></div>` : '';
+  if (!has) return drinksBlock(r) + enrich;
   const st = r.storage;
-  return `${r.troubleshoot?.length ? `<div class="r-extra"><h3>${L('Om det går fel', 'If it goes wrong')}</h3><dl class="trouble">${r.troubleshoot.map(t => `<dt>${esc(t.problem)}</dt><dd>${esc(t.fix)}</dd>`).join('')}</dl></div>` : ''}
+  return enrich + `${r.troubleshoot?.length ? `<div class="r-extra"><h3>${L('Om det går fel', 'If it goes wrong')}</h3><dl class="trouble">${r.troubleshoot.map(t => `<dt>${esc(t.problem)}</dt><dd>${esc(t.fix)}</dd>`).join('')}</dl></div>` : ''}
     ${r.serveWith?.length ? `<div class="r-extra"><h3>${L('Servera med', 'Serve with')}</h3><div class="serve">${r.serveWith.map((x, k) => `<button type="button" class="serve-btn" data-serve="${k}"><strong>${esc(x.name)}</strong>${x.why ? `<span>${esc(x.why)}</span>` : ''}</button>`).join('')}</div></div>` : ''}
     ${drinksBlock(r)}
     ${st ? `<div class="r-extra"><h3>${L('Förvaring och rester', 'Storage and leftovers')}</h3><dl class="store">
@@ -1691,7 +1701,7 @@ $('#stage').addEventListener('click', async e => {
   const sv = t.closest('[data-serve]');
   if (sv) { const r = S.current.recipe, x = r.serveWith?.[+sv.dataset.serve]; if (x) send(L(`Ge mig det kompletta receptet på ${x.name} som tillbehör till ${r.title}, för samma antal portioner.`, `Give me the complete recipe for ${x.name} as a side for ${r.title}, for the same number of servings.`), null, { flow: true, newDish: true }); return; }
   if (t.closest('[data-drinks]')) { openChat(true); send(L('Föreslå dryck till receptet: fyll "drinks" enligt Dryckestips (typ av dryck, 2–3 flaskor från Systembolaget i vår prisklass och ett alkoholfritt alternativ). Ändra INTE ingredienserna eller stegen. Skicka HELA receptet i "recipe".', 'Suggest drinks for the recipe: fill "drinks" (type of drink, 2–3 bottles from Systembolaget in our price range and an alcohol-free option). Do NOT change the ingredients or the steps. Send the WHOLE recipe in "recipe".'), null, { display: L('🍷 Föreslå dryck', '🍷 Suggest a drink'), enrich: 'drinks' }); return; }
-  if (t.closest('[data-enrich]')) { openChat(true); send(L('Komplettera receptet med översikt, aktiv tid, det som måste göras i förväg, byten för ingredienser, valfria steg, "howTo" för svåra moment, om det går fel, servera med och förvaring. Ändra INTE ingredienserna eller stegen. Skicka HELA receptet i "recipe".', 'Add an overview, active time, what must be done ahead, ingredient swaps, optional steps, "howTo" for tricky techniques, troubleshooting, serve-with ideas and storage to the recipe. Do NOT change the ingredients or the steps. Send the WHOLE recipe in "recipe".'), null, { display: L('Lägg till översikt, byten och tips', 'Add overview, swaps and tips'), enrich: true }); return; }
+  if (t.closest('[data-enrich]')) { openChat(true); send(L('Komplettera receptet med "title" för varje steg, översikt, aktiv tid, det som måste göras i förväg, byten för ingredienser, valfria steg, "howTo" för svåra moment, om det går fel, servera med och förvaring. Ändra INTE ingredienserna eller stegens text. Skicka HELA receptet i "recipe".', 'Add a "title" to every step, an overview, active time, what must be done ahead, ingredient swaps, optional steps, "howTo" for tricky techniques, troubleshooting, serve-with ideas and storage to the recipe. Do NOT change the ingredients or the steps. Send the WHOLE recipe in "recipe".'), null, { display: L('Lägg till stegrubriker, översikt och tips', 'Add step headings, overview and tips'), enrich: true }); return; }
   // Recept
   const chk = t.closest('[data-check]');
   if (chk) { S.checked[chk.dataset.check] = chk.checked; const row = chk.closest('.ing'); row.classList.toggle('checked', chk.checked); updateCount(); saveSession(); return; }
@@ -1715,7 +1725,7 @@ $('#stage').addEventListener('click', async e => {
   if (jump) { scrollToSec(jump.dataset.jump); return; }
   if (t.closest('[data-startcook]')) { if (S.activeStep == null) S.activeStep = 0; if (!S.cookStart) S.cookStart = Date.now(); refreshSteps(); scrollToSec('r-steps'); saveSession(); return; }
   const tm = t.closest('[data-timer]');
-  if (tm) { const s = S.current.recipe.steps[+tm.dataset.timer]; startTimer(L(`Steg ${+tm.dataset.timer + 1}`, `Step ${+tm.dataset.timer + 1}`), s.minutes); return; }
+  if (tm) { const s = S.current.recipe.steps[+tm.dataset.timer]; startTimer(s.title || L(`Steg ${+tm.dataset.timer + 1}`, `Step ${+tm.dataset.timer + 1}`), s.minutes); return; }
   const dn = t.closest('[data-done]');
   if (dn) { const n = +dn.dataset.done; S.doneSteps[n] = !S.doneSteps[n]; if (S.doneSteps[n] && S.activeStep === n) S.activeStep = n + 1 < S.current.recipe.steps.length ? n + 1 : null; refreshSteps(); saveSession(); return; }
   const step = t.closest('[data-step]');
@@ -1796,22 +1806,23 @@ function updateCount() {
   if (b) b.textContent = `${r.steps.filter((_, n) => S.doneSteps[n]).length}/${r.steps.length}`;
 }
 function keepScroll(fn) {
-  const els = ['#stage', '#r-ing', '#r-steps'].map(q => [q, $(q)?.scrollTop || 0]);
+  const els = ['#stage', '#r-ing', '#r-steps', '.r-main'].map(q => [q, $(q)?.scrollTop || 0]);
   fn();
   els.forEach(([q, top]) => { const el = $(q); if (el) el.scrollTop = top; });
 }
 function scrollToSec(id) {
   const el = document.getElementById(id), st = $('#stage'), nav = $('.r-jump');
   if (!el) return;
-  if (st.classList.contains('split')) { if (id === 'r-steps') { const a = el.querySelector('.step.active'); if (a) a.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } return; }
+  if (st.classList.contains('split')) { if (id === 'r-tips') { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; } if (id === 'r-steps') { const a = el.querySelector('.step.active'); if (a) a.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } return; }
   const top = el.getBoundingClientRect().top - st.getBoundingClientRect().top + st.scrollTop - (nav ? nav.offsetHeight + 8 : 0);
   st.scrollTo({ top, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 $('#stage').addEventListener('scroll', () => {
   const nav = $('.r-jump'); if (!nav) return;
-  const steps = document.getElementById('r-steps');
-  const inSteps = steps && steps.getBoundingClientRect().top - $('#stage').getBoundingClientRect().top < nav.offsetHeight + 80;
-  nav.querySelectorAll('[data-jump]').forEach(b => b.classList.toggle('on', (b.dataset.jump === 'r-steps') === !!inSteps));
+  const top0 = $('#stage').getBoundingClientRect().top + nav.offsetHeight + 80;
+  let cur = 'r-ing';
+  ['r-steps', 'r-tips'].forEach(id => { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top < top0) cur = id; });
+  nav.querySelectorAll('[data-jump]').forEach(b => b.classList.toggle('on', b.dataset.jump === cur));
 }, { passive: true });
 function refreshSteps() {
   document.querySelectorAll('.step').forEach(li => {
